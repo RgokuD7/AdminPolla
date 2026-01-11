@@ -25,7 +25,7 @@ export const getDeadlineDate = (baseDateStr: string, graceDays: number): string 
   return date.toISOString().split('T')[0];
 };
 
-export const getParticipantName = (p: Participant) => p.members.map(m => m.name).join(" / ");
+export const getParticipantName = (p: Participant) => p.members.map(m => m.name).join(" y ");
 
 export const triggerConfetti = () => {
   if (typeof confetti === 'undefined') return;

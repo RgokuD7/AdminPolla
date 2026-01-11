@@ -31,7 +31,8 @@ import {
   Edit as EditIcon,
   DoneAll as DoneAllIcon,
   FiberManualRecord as DotIcon,
-  Undo as UndoIcon
+  Undo as UndoIcon,
+  Event as EventIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -131,9 +132,28 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
       return !isPaid ? `⏳ ${getParticipantName(p)}` : null;
     }).filter(Boolean).join("\n");
 
-    const report = `📢 *REPORTE: ${settings.groupName.toUpperCase()}*\n📅 *Vence:* ${formatDateFull(stats.deadlineDate)}\n💰 *Recaudado:* ${formatCurrency(stats.collected)} / ${formatCurrency(stats.totalGoal)}\n\n*PAGOS:*\n${paidList || "_Sin pagos_"}\n\n*PENDIENTES:*\n${pendingList || "_Todo al día!_"}\n\n👉 *Receptor:* ${stats.recipient ? getParticipantName(stats.recipient) : "N/A"}`;
+    const report = `� *ESTADO ${settings.groupName.toUpperCase()}*
+� *Vencimiento:* ${formatDateFull(stats.deadlineDate)}
+
+💰 *Meta:* ${formatCurrency(stats.totalGoal)}
+📈 *Avance:* ${Math.round(stats.progress)}% (${formatCurrency(stats.collected)})
+
+👤 *Receptor Turno #${settings.currentTurn}:*
+👉 *${stats.recipient ? getParticipantName(stats.recipient).toUpperCase() : "POR DEFINIR"}*
+
+━━━━━━━━━━━━━━━━━━━━
+
+✅ *PAGOS CONFIRMADOS:*
+${paidList || "_Nadie ha pagado aún_"}
+
+━━━━━━━━━━━━━━━━━━━━
+
+⏳ *PENDIENTES:*
+${pendingList || "🎉 _¡Todos están al día!_"}
+${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
+    
     await navigator.clipboard.writeText(report);
-    setSnackbar({ open: true, message: "Reporte copiado", pid: "" });
+    setSnackbar({ open: true, message: "Reporte copiado al portapapeles", pid: "" });
   }, [participants, settings, stats]);
 
   const onIntentToggle = (p: Participant, memberIndex?: number) => {
@@ -228,14 +248,36 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                     <Typography variant="subtitle2" sx={{ fontWeight: 900, color: 'primary.main', textAlign: { sm: 'center' } }}>#{settings.currentTurn}</Typography>
                   </Box>
                   <Box sx={{ textAlign: { sm: 'right' } }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>VENCE EL</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: stats.isFullyPaid ? 'secondary.main' : 'primary.main', fontSize: '0.875rem' }}>{formatDateReadable(stats.deadlineDate)}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block', mb: 0.5 }}>VENCIMIENTO</Typography>
+                    <Paper elevation={0} sx={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: 1,
+                        bgcolor: stats.isFullyPaid ? '#DCFCE7' : '#FEE2E2', 
+                        color: stats.isFullyPaid ? '#15803d' : '#991B1B', 
+                        px: 1.5, py: 0.5, borderRadius: 2
+                    }}>
+                        <EventIcon sx={{ fontSize: 16 }} />
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                            {formatDateReadable(stats.deadlineDate)}
+                        </Typography>
+                    </Paper>
                   </Box>
                 </Stack>
               </Grid>
             </Grid>
           </Box>
         </Paper>
+
+        <Button 
+          variant="outlined" 
+          fullWidth
+          onClick={handleCopyReport}
+          startIcon={<ContentCopyIcon />}
+          sx={{ mb: 4, borderRadius: 3, py: 1.5, borderColor: '#E5E7EB', color: 'text.secondary', fontWeight: 600 }}
+        >
+          Copiar Reporte de Estado
+        </Button>
 
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, px: 0.5 }}>
           <Typography variant="h6">Integrantes</Typography>
@@ -387,9 +429,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
         </Stack>
       </Container>
       
-      <Fab color="primary" variant="extended" onClick={handleCopyReport} sx={{ position: 'fixed', bottom: 110, right: 24, px: 3, borderRadius: 3, boxShadow: '0 8px 16px rgba(0,0,0,0.2)' }}>
-        <ContentCopyIcon sx={{ mr: 1, fontSize: 20 }} /> Copiar Reporte
-      </Fab>
+
       <Dialog open={confirmPayment.open} onClose={() => setConfirmPayment({ open: false, p: null })} PaperProps={{ sx: { borderRadius: 4, width: '100%', maxWidth: 360 } }}>
         <DialogTitle sx={{ textAlign: 'center', pt: 4, pb: 1, fontWeight: 800 }}>
            Confirmar Acción
@@ -420,8 +460,35 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
           </Button>
         </DialogActions>
       </Dialog>
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-        <Alert severity="success" variant="filled" sx={{ borderRadius: 2 }} action={snackbar.pid && <Button color="inherit" size="small" onClick={() => onTogglePayment(snackbar.pid)} startIcon={<UndoIcon />}>Deshacer</Button>}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ bottom: { xs: 40, sm: 40 } }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity="success" 
+          variant="filled" 
+          sx={{ 
+            width: '100%', 
+            borderRadius: 4, 
+            bgcolor: '#111827', // Dark Gray / Black
+            color: 'white',
+            fontWeight: 600,
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            alignItems: 'center',
+            '& .MuiAlert-icon': { color: '#4ADE80' } // Green icon
+          }} 
+          action={
+            snackbar.pid && (
+              <Button color="inherit" size="small" onClick={() => onTogglePayment(snackbar.pid)} startIcon={<UndoIcon />} sx={{ textTransform: 'none', fontWeight: 700, ml: 1 }}>
+                Deshacer
+              </Button>
+            )
+          }
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

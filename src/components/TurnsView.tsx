@@ -46,7 +46,8 @@ import {
   Lock as LockIcon,
   LockOpen as LockOpenIcon,
   MoreVert as MoreVertIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Groups as GroupsIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -208,14 +209,26 @@ const TurnsView: React.FC<TurnsViewProps> = ({
     const baseIndex = participants.length;
     
     const newParticipants: Participant[] = lines.map((line, i) => {
-      const words = line.split(/\s+/).filter(w => w.length > 0);
-      const isDuoLine = words.length === 2;
+      // Buscamos separadores explícitos: "/", ",", "&", "+" o " y "
+      // Si no hay separador, asumimos que es UN SOLO nombre completo (ej: "Juan Carlos")
+      const separators = ["/", ",", "&", "+", " y "];
+      let parts: string[] = [line];
+      
+      for (const sep of separators) {
+        if (line.includes(sep)) {
+          parts = line.split(sep).map(s => s.trim()).filter(Boolean);
+          break; // Usamos el primer separador que encontremos
+        }
+      }
+
+      // Solo si encontramos exactamente 2 partes válidas, lo hacemos compartido
+      const isSharedLine = parts.length === 2;
       
       return {
         id: "p-bulk-" + Date.now() + i,
-        type: isDuoLine ? 'shared' : 'single',
-        members: isDuoLine 
-          ? [ { name: words[0], phone: "", paymentHistory: {} }, { name: words[1], phone: "", paymentHistory: {} } ]
+        type: isSharedLine ? 'shared' : 'single',
+        members: isSharedLine 
+          ? [ { name: parts[0], phone: "", paymentHistory: {} }, { name: parts[1], phone: "", paymentHistory: {} } ]
           : [ { name: line, phone: "", paymentHistory: {} } ],
         isPaid: false,
         turnNumber: baseIndex + i + 1,
@@ -271,7 +284,12 @@ const TurnsView: React.FC<TurnsViewProps> = ({
           <Stack spacing={2.5}>
             <FormControlLabel
               control={<Switch size="small" checked={isShared} onChange={e => setIsShared(e.target.checked)} />}
-              label={<Typography variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>👥 Turno Compartido (Pareja)</Typography>}
+              label={
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <GroupsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>Turno Compartido (Pareja)</Typography>
+                </Stack>
+              }
               sx={{ ml: 0.5, mb: 0 }}
             />
             
@@ -547,13 +565,14 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         <DialogContent>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
             Pega una lista de nombres. <br/>
-            💡 Si una línea tiene exactamente 2 nombres (ej: "Juan Pedro"), se creará como un turno compartido.
+            💡 Para un turno compartido, usa un separador ( <b>/</b> , <b>+</b> , <b>&</b> ).<br/>
+            Ejemplo: <b>Juan / Pedro</b>
           </Typography>
           <TextField 
             multiline 
             rows={8} 
             fullWidth 
-            placeholder="Juan&#10;Goku Vegeta (Compartido)&#10;Gohan..." 
+            placeholder="Ana Maria (Individual)&#10;Goku / Vegeta (Compartido)&#10;Gohan..." 
             value={bulkText} 
             onChange={e => setBulkText(e.target.value)} 
           />
