@@ -23,6 +23,7 @@ import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
 import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
+import { calculateCurrentTurnFromDate } from "@/utils/helpers";
 import { signOut } from "firebase/auth";
 import { PollaService } from "@/services/firestore";
 
@@ -69,6 +70,18 @@ const App = () => {
 
   // === CALCULOS ===
   const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
+
+  // AUTO-CRON: Verificar si el turno actual corresponde con la fecha y corregirlo si es necesario
+  useEffect(() => {
+    if (activeGroup?.settings?.startDate) {
+        const realTurn = calculateCurrentTurnFromDate(activeGroup.settings);
+        if (activeGroup.settings.currentTurn !== realTurn) {
+            console.log(`🔄 Auto-corrigiendo turno: ${activeGroup.settings.currentTurn} -> ${realTurn}`);
+            PollaService.updateSettings(activeGroup.id, { ...activeGroup.settings, currentTurn: realTurn })
+              .catch(err => console.error("Error auto-corrigiendo turno:", err));
+        }
+    }
+  }, [activeGroup]);
 
   // === HANDLERS FIREBASE ===
   
