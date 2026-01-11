@@ -35,7 +35,7 @@ import {
   Logout as LogoutIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
-import { formatCurrency, getCollectedAmount, getParticipantName } from "@/utils/helpers";
+import { formatCurrency, getCollectedAmount, getParticipantName, calculateCurrentTurnFromDate } from "@/utils/helpers";
 
 interface ListViewProps {
   groups: PollaGroup[];
@@ -305,7 +305,15 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 1 }}>
           <Button onClick={() => setOpen(false)} color="inherit">Cerrar</Button>
-          <Button variant="contained" onClick={() => { if(form.groupName.trim()) { onCreate(form); setOpen(false); } }}>Confirmar</Button>
+          <Button variant="contained" onClick={() => { 
+            if(form.groupName.trim()) { 
+               // Calcular turno inicial real basado en la fecha (y gracia)
+               const realTurn = calculateCurrentTurnFromDate(form);
+               const finalForm = { ...form, currentTurn: realTurn };
+               onCreate(finalForm); 
+               setOpen(false); 
+            } 
+          }}>Confirmar</Button>
         </DialogActions>
       </Dialog>
       

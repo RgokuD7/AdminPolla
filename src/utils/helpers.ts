@@ -49,22 +49,30 @@ export const triggerConfetti = () => {
 
 export const calculateCurrentTurnFromDate = (settings: AppSettings): number => {
   if (!settings.startDate) return 1;
-  const start = new Date(settings.startDate + "T12:00:00");
+  
+  // Ajustamos 'now' al momento actual
   const now = new Date();
-  
-  // Calcular diferencia de meses
-  const monthsDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-  
-  if (settings.frequency === 'monthly') {
-    // Mes 0 (mismo mes) = Turno 1
-    return Math.max(1, monthsDiff + 1);
-  } else {
-    // Quincenal: Cada mes son 2 turnos
-    let turn = monthsDiff * 2;
-    // Día 1-15: Primera quincena (+1) | Día 16+: Segunda quincena (+2)
-    turn += now.getDate() <= 15 ? 1 : 2;
-    return Math.max(1, turn);
+  let turn = 1;
+
+  // Límite de seguridad para evitar loops infinitos (ej: 10 años de quincenas ~ 240 turnos)
+  // Buscamos el primer turno cuya FECHA DE VENCIMIENTO (Deadline) sea HOY o FUTURA.
+  // Es decir, si hoy estamos dentro del plazo (incluso gracia) del turno X, ese es el actual.
+  while (turn < 500) {
+      const pDateStr = calculatePaymentDate(settings, turn);
+      const graceDays = getGraceDaysForTurn(settings, turn);
+      const deadlineStr = getDeadlineDate(pDateStr, graceDays);
+      
+      // Usamos el final del día de vencimiento para comparar
+      const deadlineDate = new Date(deadlineStr + "T23:59:59");
+
+      // Si la fecha límite es mayor o igual a ahora, significa que este turno
+      // sigue vigente (aún no vence totalmente).
+      if (deadlineDate >= now) {
+          return turn;
+      }
+      turn++;
   }
+  return turn;
 };
 
 // --- NEW HELPERS ---

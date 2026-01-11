@@ -627,6 +627,37 @@ const TurnsView: React.FC<TurnsViewProps> = ({
       >
         <DialogTitle sx={{ fontWeight: 800, pt: 3 }}>Editar Participante</DialogTitle>
         <DialogContent>
+          <FormControlLabel 
+            control={
+              <Switch 
+                checked={editingParticipant?.type === 'shared'} 
+                onChange={(e) => {
+                   if (!editingParticipant) return;
+                   const isShared = e.target.checked;
+                   const newType = isShared ? 'shared' : 'single';
+                   let newMembers = [...editingParticipant.members];
+                   
+                   if (isShared && newMembers.length < 2) {
+                       // Si pasamos a compartido, aseguramos tener al menos 2 huecos
+                       newMembers.push({ name: '', phone: '', bankDetails: '', paymentHistory: {} });
+                   } else if (!isShared && newMembers.length > 1) {
+                       // Si pasamos a individual, cortamos los extras y dejamos solo el primero
+                       // ¡Adiós fantasma!
+                       newMembers = [newMembers[0]];
+                   }
+                   
+                   setEditingParticipant({ 
+                       ...editingParticipant, 
+                       type: newType, 
+                       members: newMembers 
+                   });
+                }} 
+              />
+            } 
+            label="Es Turno Compartido" 
+            sx={{ mt: 1, mb: 2, display: 'block' }}
+          />
+
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             {editingParticipant?.members.map((m, i) => (
               <Stack key={i} spacing={1.5}>
