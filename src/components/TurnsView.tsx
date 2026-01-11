@@ -31,7 +31,8 @@ import {
   Tooltip,
   Divider,
   Alert,
-  useTheme
+  useTheme,
+  Collapse
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -47,7 +48,9 @@ import {
   LockOpen as LockOpenIcon,
   MoreVert as MoreVertIcon,
   Event as EventIcon,
-  Groups as GroupsIcon
+  Groups as GroupsIcon,
+  AccountBalance as BankIcon,
+  ExpandMore as ExpandIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -85,9 +88,14 @@ const TurnsView: React.FC<TurnsViewProps> = ({
   const theme = useTheme();
   const [name1, setName1] = useState("");
   const [phone1, setPhone1] = useState("");
+  const [bank1, setBank1] = useState("");
+  
   const [name2, setName2] = useState("");
   const [phone2, setPhone2] = useState("");
+  const [bank2, setBank2] = useState("");
+  
   const [isShared, setIsShared] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
@@ -121,17 +129,18 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         id: "p-" + Date.now(),
         type: isShared ? 'shared' : 'single',
         members: isShared ? [
-          { name: name1.trim(), phone: phone1.trim(), paymentHistory: {} },
-          { name: name2.trim(), phone: phone2.trim(), paymentHistory: {} }
-        ] : [{ name: name1.trim(), phone: phone1.trim(), paymentHistory: {} }],
+          { name: name1.trim(), phone: phone1.trim(), bankDetails: bank1.trim(), paymentHistory: {} },
+          { name: name2.trim(), phone: phone2.trim(), bankDetails: bank2.trim(), paymentHistory: {} }
+        ] : [{ name: name1.trim(), phone: phone1.trim(), bankDetails: bank1.trim(), paymentHistory: {} }],
         isPaid: false, // Legacy
         turnNumber: participants.length + 1,
         paymentHistory: {}
       };
       onAddParticipant(newParticipant);
-      setName1(""); setPhone1("");
-      setName2(""); setPhone2("");
+      setName1(""); setPhone1(""); setBank1("");
+      setName2(""); setPhone2(""); setBank2("");
       setIsShared(false);
+      setShowAdvanced(false);
     } 
   };
 
@@ -196,7 +205,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
     }
   };
 
-  const updateEditMember = (index: number, field: 'name' | 'phone', value: string) => {
+  const updateEditMember = (index: number, field: 'name' | 'phone' | 'bankDetails', value: string) => {
     if (editingParticipant) {
       const newMembers = [...editingParticipant.members];
       newMembers[index] = { ...newMembers[index], [field]: value };
@@ -263,7 +272,13 @@ const TurnsView: React.FC<TurnsViewProps> = ({
           </Tooltip>
           {!settings.isLocked && (
             <>
-              <Tooltip title="Mezclar Turnos"><IconButton onClick={onShuffle} sx={{ border: '1px solid #E5E7EB', borderRadius: 2 }}><ShuffleIcon fontSize="small" /></IconButton></Tooltip>
+              <Tooltip title={settings.currentTurn > 1 ? "No se puede mezclar iniciado el periodo" : "Mezclar Turnos"}>
+                <span>
+                  <IconButton onClick={onShuffle} disabled={settings.currentTurn > 1} sx={{ border: '1px solid #E5E7EB', borderRadius: 2 }}>
+                    <ShuffleIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
               <Tooltip title="Pegar Lista"><IconButton onClick={() => setBulkOpen(true)} sx={{ border: '1px solid #E5E7EB', borderRadius: 2 }}><PasteIcon fontSize="small" /></IconButton></Tooltip>
             </>
           )}
@@ -274,14 +289,14 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         <Paper 
           variant="outlined" 
           sx={{ 
-            p: 2.5, 
+            p: 2, // Reducido padding interno ligeramente
             mb: 4, 
             borderRadius: 3, 
             bgcolor: alpha(theme.palette.background.default, 0.5), 
             border: '1px solid #E5E7EB'
           }}
         >
-          <Stack spacing={2.5}>
+          <Stack spacing={1}> 
             <FormControlLabel
               control={<Switch size="small" checked={isShared} onChange={e => setIsShared(e.target.checked)} />}
               label={
@@ -293,7 +308,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
               sx={{ ml: 0.5, mb: 0 }}
             />
             
-            <Stack spacing={1.5}>
+            <Box>
               <TextField 
                 placeholder={isShared ? "Nombre Persona 1" : "Nombre completo"}
                 fullWidth 
@@ -305,20 +320,97 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   sx: { bgcolor: 'white' }
                 }}
               />
-              <TextField 
-                placeholder={isShared ? "+569 Teléfono 1" : "+569 12345678"} 
-                fullWidth 
-                size="small"
-                value={phone1} 
-                onChange={e => setPhone1(e.target.value)} 
-                InputProps={{
-                  startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 18, color: 'secondary.main' }} /></InputAdornment>,
-                  sx: { bgcolor: 'white' }
+              
+              <Typography 
+                variant="caption"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                sx={{ 
+                    cursor: 'pointer',
+                    color: 'text.secondary', 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    my: 1,
+                    fontWeight: 500,
+                    '&:hover': { color: 'primary.main' }
                 }}
-              />
-              {isShared && (
-                <>
+              >
+                {showAdvanced ? "Menos opciones" : "Agregar banco y WhatsApp"} 
+                <ExpandIcon sx={{ transform: showAdvanced ? 'rotate(180deg)' : 'none', transition: '0.2s', fontSize: 16, ml: 0.5 }} />
+              </Typography>
+
+              <Collapse in={showAdvanced}>
+                <Stack spacing={1.5} sx={{ mb: 1.5 }}>
                   <TextField 
+                    placeholder={isShared ? "WhatsApp Persona 1 (+569...)" : "WhatsApp (+569...)"} 
+                    fullWidth 
+                    size="small"
+                    value={phone1} 
+                    onChange={e => setPhone1(e.target.value)} 
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 18, color: 'secondary.main' }} /></InputAdornment>,
+                      sx: { bgcolor: 'white' }
+                    }}
+                  />
+                  <TextField 
+                    placeholder="Pegar datos bancarios aquí...&#10;Banco: ...&#10;Cuenta: ...&#10;RUT: ..." 
+                    fullWidth 
+                    multiline
+                    minRows={4}
+                    size="small"
+                    value={bank1} 
+                    onChange={e => setBank1(e.target.value)} 
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start" sx={{ mt: 1.5 }}><BankIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
+                      sx: { bgcolor: 'white', alignItems: 'flex-start' }
+                    }}
+                  />
+                  
+                  {isShared && (
+                    <>
+                      <Divider sx={{ my: 1 }}><Typography variant="caption" color="text.secondary">PERSONA 2</Typography></Divider>
+                       <TextField 
+                        placeholder="Nombre Persona 2"
+                        fullWidth 
+                        size="small"
+                        value={name2} 
+                        onChange={e => setName2(e.target.value)} 
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start"><PersonAddIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
+                          sx: { bgcolor: 'white' }
+                        }}
+                      />
+                      <TextField 
+                        placeholder="WhatsApp Persona 2" 
+                        fullWidth 
+                        size="small"
+                        value={phone2} 
+                        onChange={e => setPhone2(e.target.value)} 
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 18, color: 'secondary.main' }} /></InputAdornment>,
+                          sx: { bgcolor: 'white' }
+                        }}
+                      />
+                      <TextField 
+                        placeholder="Pegar datos bancarios aquí...&#10;Banco: ...&#10;Cuenta: ...&#10;RUT: ..." 
+                        fullWidth 
+                        multiline
+                        minRows={4}
+                        size="small"
+                        value={bank2} 
+                        onChange={e => setBank2(e.target.value)} 
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start" sx={{ mt: 1.5 }}><BankIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
+                          sx: { bgcolor: 'white', alignItems: 'flex-start' }
+                        }}
+                      />
+                    </>
+                  )}
+                </Stack>
+              </Collapse>
+
+              {/* Si es compartido pero NO está expandido, necesitamos mostrar el input del Nombre 2 OBLIGATORIAMENTE */}
+              {isShared && !showAdvanced && (
+                 <TextField 
                     placeholder="Nombre Persona 2"
                     fullWidth 
                     size="small"
@@ -326,23 +418,11 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                     onChange={e => setName2(e.target.value)} 
                     InputProps={{
                       startAdornment: <InputAdornment position="start"><PersonAddIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
-                      sx: { bgcolor: 'white' }
+                      sx: { bgcolor: 'white', mt: 1.5 }
                     }}
                   />
-                  <TextField 
-                    placeholder="+569 Teléfono 2" 
-                    fullWidth 
-                    size="small"
-                    value={phone2} 
-                    onChange={e => setPhone2(e.target.value)} 
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 18, color: 'secondary.main' }} /></InputAdornment>,
-                      sx: { bgcolor: 'white' }
-                    }}
-                  />
-                </>
               )}
-            </Stack>
+            </Box>
 
             <Button 
               variant="contained" 
@@ -355,7 +435,6 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                 borderRadius: 2,
                 bgcolor: 'primary.main',
                 '&:hover': { bgcolor: '#1f2937' },
-                py: 1.5
               }}
             >
               Agregar a la lista
@@ -416,8 +495,22 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   <Stack direction="row" spacing={0} alignItems="center">
                     {!settings.isLocked && (
                       <Stack direction="column" sx={{ mr: 1 }}>
-                        <IconButton size="small" disabled={idx === 0} onClick={() => onReorder(idx, idx - 1)} sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}><UpIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" disabled={idx === participants.length - 1} onClick={() => onReorder(idx, idx + 1)} sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}><DownIcon fontSize="small" /></IconButton>
+                        <IconButton 
+                          size="small" 
+                          disabled={idx === 0 || p.turnNumber <= settings.currentTurn} 
+                          onClick={() => onReorder(idx, idx - 1)} 
+                          sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}
+                        >
+                          <UpIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          disabled={idx === participants.length - 1 || p.turnNumber < settings.currentTurn} 
+                          onClick={() => onReorder(idx, idx + 1)} 
+                          sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}
+                        >
+                          <DownIcon fontSize="small" />
+                        </IconButton>
                       </Stack>
                     )}
                     <IconButton size="small" onClick={(e) => handleOpenMenu(e, p.id)} sx={{ color: 'text.secondary' }}><MoreVertIcon fontSize="small" /></IconButton>
@@ -471,17 +564,23 @@ const TurnsView: React.FC<TurnsViewProps> = ({
       >
         <MenuItem onClick={handleEditClick} sx={{ py: 1.2 }}>
           <EditIcon fontSize="small" sx={{ mr: 1.5, color: 'text.secondary' }} />
-          <Typography variant="subtitle2">Editar</Typography>
+          <Typography variant="subtitle2">Editar Datos</Typography>
         </MenuItem>
-        <MenuItem onClick={handleSetDateClick} sx={{ py: 1.2 }}>
-          <EventIcon fontSize="small" sx={{ mr: 1.5, color: 'text.secondary' }} />
-          <Typography variant="subtitle2">Cambiar Fecha/Turno</Typography>
-        </MenuItem>
-        <Divider sx={{ my: 0.5 }} />
-        <MenuItem onClick={handleDeleteClick} sx={{ py: 1.2, color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1.5 }} />
-          <Typography variant="subtitle2">Eliminar</Typography>
-        </MenuItem>
+        
+        {/* Solo permitimos mover/eliminar si el turno NO ha pasado aun */}
+        {participants.find(p => p.id === menuAnchor?.pid)?.turnNumber! >= settings.currentTurn && (
+          <>
+            <MenuItem onClick={handleSetDateClick} sx={{ py: 1.2 }}>
+              <EventIcon fontSize="small" sx={{ mr: 1.5, color: 'text.secondary' }} />
+              <Typography variant="subtitle2">Cambiar Fecha/Turno</Typography>
+            </MenuItem>
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem onClick={handleDeleteClick} sx={{ py: 1.2, color: 'error.main' }}>
+              <DeleteIcon fontSize="small" sx={{ mr: 1.5 }} />
+              <Typography variant="subtitle2">Eliminar</Typography>
+            </MenuItem>
+          </>
+        )}
       </Menu>
 
       {/* Calendar Date Reorder Dialog */}
@@ -505,8 +604,8 @@ const TurnsView: React.FC<TurnsViewProps> = ({
               onChange={(e) => setTargetDate(e.target.value)}
             >
               {availableDates.map(d => (
-                <MenuItem key={d.turn} value={d.date}>
-                  T{d.turn} — {formatDateFull(d.date)}
+                <MenuItem key={d.turn} value={d.date} disabled={d.turn < settings.currentTurn}>
+                  T{d.turn} — {formatDateFull(d.date)} {d.turn < settings.currentTurn ? "(Cerrado)" : ""}
                 </MenuItem>
               ))}
             </Select>
@@ -537,17 +636,37 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   </Typography>
                 )}
                 <TextField 
-                  label="Nombre completo" 
+                  placeholder={editingParticipant.type === 'shared' ? `Nombre Persona ${i + 1}` : "Nombre completo"}
                   fullWidth 
+                  size="small"
                   value={m.name} 
-                  onChange={(e) => updateEditMember(i, 'name', e.target.value)} 
+                  onChange={(e) => updateEditMember(i, 'name', e.target.value)}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><PersonAddIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
+                  }}
                 />
                 <TextField 
-                  label="Teléfono WhatsApp" 
+                  placeholder="WhatsApp (+569...)"
                   fullWidth 
-                  placeholder="+569..."
+                  size="small" 
                   value={m.phone} 
-                  onChange={(e) => updateEditMember(i, 'phone', e.target.value)} 
+                  onChange={(e) => updateEditMember(i, 'phone', e.target.value)}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 18, color: 'secondary.main' }} /></InputAdornment>,
+                  }} 
+                />
+                <TextField 
+                  placeholder="Pegar datos bancarios aquí...&#10;Banco: ...&#10;Cuenta: ...&#10;RUT: ..." 
+                  fullWidth 
+                  multiline
+                  minRows={4}
+                  size="small"
+                  value={m.bankDetails || ""} 
+                  onChange={(e) => updateEditMember(i, 'bankDetails', e.target.value)} 
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start" sx={{ mt: 1.5 }}><BankIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>,
+                    sx: { alignItems: 'flex-start' }
+                  }}
                 />
                 {i === 0 && editingParticipant.type === 'shared' && <Divider sx={{ my: 1 }} />}
               </Stack>

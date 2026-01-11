@@ -125,14 +125,9 @@ const App = () => {
     updateActiveGroupParticipants(sorted.map((p, i) => ({ ...p, turnNumber: i + 1 })));
   };
 
-  const handleTogglePayment = (pid: string, memberIndex?: number) => {
-    if (!activeGroup) return;
-    const currentTurn = activeGroup.settings.currentTurn;
-    
-    const updatedParticipants = activeGroup.participants.map(p => {
-      if (p.id !== pid) return p;
-
-      // Inicializar historial si no existe
+  // Función pura para calcular el nuevo estado de un participante tras un toggle
+  const toggleParticipantPayment = (p: Participant, currentTurn: number, memberIndex?: number): Participant => {
+      // Inicializar historial
       const pHistory = { ...(p.paymentHistory || {}) };
       
       // Caso 1: Pago individual en grupo compartido
@@ -141,27 +136,22 @@ const App = () => {
             if (idx === memberIndex) {
                  const mHistory = { ...(m.paymentHistory || {}) };
                  const isCurrentlyPaid = mHistory[currentTurn] || false;
-                 // Toggle
                  mHistory[currentTurn] = !isCurrentlyPaid;
-                 return { ...m, paymentHistory: mHistory, isPaid: !isCurrentlyPaid }; // isPaid legacy opcional
+                 return { ...m, paymentHistory: mHistory, isPaid: !isCurrentlyPaid };
             }
             return m;
         });
-        
-        // El padre está "Completo" para ESTE turno solo si TODOS los hijos pagaron ESTE turno
         const allPaidThisTurn = newMembers.every(m => m.paymentHistory?.[currentTurn]);
         pHistory[currentTurn] = allPaidThisTurn;
-        
         return { ...p, members: newMembers, paymentHistory: pHistory, isPaid: allPaidThisTurn };
       } 
       
-      // Caso 2: Pago total (Participante Simple o Click en Padre)
+      // Caso 2: Pago total
       const isCurrentlyPaid = pHistory[currentTurn] || false;
       const newPaidStatus = !isCurrentlyPaid;
       pHistory[currentTurn] = newPaidStatus;
       
       let newMembers = p.members;
-      // Si es compartido y tocamos el padre, marcamos todos los hijos igual para este turno
       if (p.type === 'shared') {
         newMembers = p.members.map(m => {
             const mHistory = { ...(m.paymentHistory || {}) };
@@ -169,11 +159,35 @@ const App = () => {
             return { ...m, paymentHistory: mHistory, isPaid: newPaidStatus };
         });
       }
-
       return { ...p, paymentHistory: pHistory, isPaid: newPaidStatus, members: newMembers };
-    });
+  };
 
+  const handleTogglePayment = (pid: string, memberIndex?: number) => {
+    if (!activeGroup) return;
+    const currentTurn = activeGroup.settings.currentTurn;
+    const updatedParticipants = activeGroup.participants.map(p => {
+       if (p.id !== pid) return p;
+       return toggleParticipantPayment(p, currentTurn, memberIndex);
+    });
     updateActiveGroupParticipants(updatedParticipants);
+  };
+
+  const handleBatchTogglePayment = (updates: { pid: string, memberIndex?: number }[]) => {
+    if (!activeGroup) return;
+    const currentTurn = activeGroup.settings.currentTurn;
+    
+    // Clonamos lista inicial
+    let nextParticipants = [...activeGroup.participants];
+    
+    // Aplicamos cada update secuencialmente sobre la lista acumulada
+    updates.forEach(({ pid, memberIndex }) => {
+        const idx = nextParticipants.findIndex(p => p.id === pid);
+        if (idx !== -1) {
+            nextParticipants[idx] = toggleParticipantPayment(nextParticipants[idx], currentTurn, memberIndex);
+        }
+    });
+    
+    updateActiveGroupParticipants(nextParticipants);
   };
 
   // === RENDER ===
@@ -227,6 +241,7 @@ const App = () => {
             participants={activeGroup.participants} 
             settings={activeGroup.settings} 
             onTogglePayment={handleTogglePayment} 
+            onBatchTogglePayment={handleBatchTogglePayment}
           />
         )}
         {view === 1 && (

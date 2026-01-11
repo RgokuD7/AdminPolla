@@ -18,7 +18,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Checkbox,
+  FormControlLabel
 } from "@mui/material";
 import {
   ContentCopy as ContentCopyIcon,
@@ -50,12 +52,17 @@ interface DashboardViewProps {
   participants: Participant[];
   settings: AppSettings;
   onTogglePayment: (id: string, memberIndex?: number) => void;
+  onBatchTogglePayment?: (updates: { pid: string, memberIndex?: number }[]) => void;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, onTogglePayment }) => {
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", pid: "" });
+const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, onTogglePayment, onBatchTogglePayment }) => {
+  const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, pid: string, memberIndex?: number }>({ open: false, message: "", pid: "" });
   const [confirmPayment, setConfirmPayment] = useState<{ open: boolean, p: Participant | null, memberIndex?: number }>({ open: false, p: null });
   const [isMarkingMode, setIsMarkingMode] = useState(false);
+  
+  // Estado para pagos relacionados (misma persona, otros turnos)
+  const [relatedPayments, setRelatedPayments] = useState<{ id: string, memberIndex?: number, turnNumber: number }[]>([]);
+  const [payRelated, setPayRelated] = useState(false);
 
   // Helper para saber si alguien pagó el turno actual
   const isParticipantPaid = (p: Participant, turn: number) => {
@@ -120,17 +127,31 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
       return isPaid ? `✅ ${getParticipantName(p)}` : null;
     }).filter(Boolean).join("\n");
 
-    const pendingList = participants.map(p => {
-      const isPaid = isParticipantPaid(p, settings.currentTurn);
+    // Agrupar deudas por nombre para mostrar totales consolidados
+    const debts: Record<string, number> = {};
 
+    participants.forEach(p => {
       if (p.type === 'shared') {
-        const pendingMembers = p.members.filter((m, idx) => !isSharedMemberPaid(p, idx, settings.currentTurn)).map(m => m.name);
-        if (pendingMembers.length === 0) return null;
-        if (pendingMembers.length === p.members.length) return `⏳ ${getParticipantName(p)}`;
-        return null;
+        const amountPerMember = settings.quotaAmount / p.members.length;
+        p.members.forEach((m, idx) => {
+          if (!isSharedMemberPaid(p, idx, settings.currentTurn)) {
+             const nameKey = m.name.trim(); 
+             debts[nameKey] = (debts[nameKey] || 0) + amountPerMember;
+          }
+        });
+      } else {
+        if (!isParticipantPaid(p, settings.currentTurn)) {
+           // Usamos el nombre del primer miembro si es single (que debería ser el único)
+           const nameKey = p.members[0].name.trim();
+           debts[nameKey] = (debts[nameKey] || 0) + settings.quotaAmount;
+        }
       }
-      return !isPaid ? `⏳ ${getParticipantName(p)}` : null;
-    }).filter(Boolean).join("\n");
+    });
+
+    const pendingList = Object.entries(debts)
+      .map(([name, amount]) => `⏳ ${name}: ${formatCurrency(amount)}`)
+      .sort((a, b) => a.localeCompare(b))
+      .join("\n");
 
     const report = `� *ESTADO ${settings.groupName.toUpperCase()}*
 � *Vencimiento:* ${formatDateFull(stats.deadlineDate)}
@@ -157,10 +178,57 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
   }, [participants, settings, stats]);
 
   const onIntentToggle = (p: Participant, memberIndex?: number) => {
+    // 1. Determinar estado ACTUAL y Nombre del objetivo
+    const targetIsPaid = (p.type === 'shared' && memberIndex !== undefined)
+        ? isSharedMemberPaid(p, memberIndex, settings.currentTurn)
+        : isParticipantPaid(p, settings.currentTurn);
+
+    const targetName = (p.type === 'shared' && memberIndex !== undefined) 
+        ? p.members[memberIndex].name.trim().toLowerCase()
+        : p.members[0].name.trim().toLowerCase();
+
+    // 2. Buscar otros items de la MISMA persona con el MISMO ESTADO
+    // (Ej: Si voy a MARCAR, busco otros pendientes. Si voy a DESMARCAR, busco otros pagados)
+    const related: { id: string, memberIndex?: number, turnNumber: number }[] = [];
+    
+    participants.forEach(other => {
+       if (other.type === 'shared') {
+          other.members.forEach((m, idx) => {
+             if (m.name.trim().toLowerCase() === targetName) {
+                 const isSameTarget = (other.id === p.id && idx === memberIndex);
+                 const otherIsPaid = isSharedMemberPaid(other, idx, settings.currentTurn);
+                 
+                 // Solo agregamos si NO es el mismo Y tienen el mismo estado (para aplicarles el mismo cambio)
+                 if (!isSameTarget && otherIsPaid === targetIsPaid) {
+                     related.push({ id: other.id, memberIndex: idx, turnNumber: other.turnNumber });
+                 }
+             }
+          });
+       } else {
+          // Single participant
+          const m = other.members[0];
+          if (m.name.trim().toLowerCase() === targetName) {
+              const isSameTarget = (other.id === p.id); 
+              const otherIsPaid = isParticipantPaid(other, settings.currentTurn);
+
+              if (!isSameTarget && otherIsPaid === targetIsPaid) {
+                  related.push({ id: other.id, memberIndex: undefined, turnNumber: other.turnNumber });
+              }
+          }
+       }
+    });
+
+    setRelatedPayments(related);
+    
     if (isMarkingMode) { 
-        onTogglePayment(p.id, memberIndex); 
-        return; 
+        // Si hay relacionados, FORZAMOS EL DIÁLOGO para preguntar.
+        if (related.length === 0) {
+            onTogglePayment(p.id, memberIndex); 
+            return; 
+        }
     }
+
+    setPayRelated(false); 
     setConfirmPayment({ open: true, p, memberIndex });
   };
 
@@ -410,7 +478,7 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
                                         <>
                                           <DotIcon sx={{ fontSize: 10, color: isMemberPaid ? '#10B981' : '#F59E0B' }} />
                                           <Typography variant="caption" sx={{ color: isMemberPaid ? '#047857' : '#B45309', fontWeight: 800, letterSpacing: '0.05em' }}>
-                                            {isMemberPaid ? "LISTO" : "PENDIENTE"}
+                                            {isMemberPaid ? "PAGADO" : "PENDIENTE"}
                                           </Typography>
                                         </>
                                     )}
@@ -450,19 +518,66 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
            <Typography variant="body2" sx={{ bgcolor: '#FEF3C7', color: 'warning.dark', p: 1, borderRadius: 2, display: 'inline-block' }}>
               ¿Cambiar estado de pago?
            </Typography>
+           
+           {relatedPayments.length > 0 && (
+              <Box sx={{ mt: 2, textAlign: 'left', bgcolor: '#F3F4F6', p: 1.5, borderRadius: 2 }}>
+                  <FormControlLabel 
+                      sx={{ mr: 0 }}
+                      control={<Checkbox size="small" checked={payRelated} onChange={e => setPayRelated(e.target.checked)} color="secondary" />}
+                      label={
+                        <Typography variant="caption" fontWeight={600} color="text.secondary">
+                          Marcar también {relatedPayments.length} cuota(s) extra (Turnos {relatedPayments.map(r => `#${r.turnNumber}`).join(', ')})
+                        </Typography>
+                      }
+                  />
+              </Box>
+           )}
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0, justifyContent: 'center', gap: 1 }}>
-          <Button fullWidth variant="outlined" onClick={() => setConfirmPayment({ open: false, p: null })} sx={{ fontWeight: 700 }}>
+          <Button fullWidth variant="outlined" onClick={() => setConfirmPayment({ open: false, p: null })} sx={{ borderRadius: 2, fontWeight: 700, py: 1.5, borderColor: 'text.secondary', color: 'text.primary' }}>
             Cancelar
           </Button>
-          <Button fullWidth variant="contained" color="secondary" onClick={() => { if(confirmPayment.p) { onTogglePayment(confirmPayment.p.id, confirmPayment.memberIndex); setSnackbar({ open: true, message: "Estado actualizado", pid: confirmPayment.p.id }); } setConfirmPayment({ open: false, p: null }); }} sx={{ py: 1.5, borderRadius: 2, fontWeight: 700 }}>
+          <Button 
+            fullWidth 
+            variant="contained" 
+            color="secondary" 
+            onClick={() => { 
+                if(confirmPayment.p) { 
+                    if (payRelated && onBatchTogglePayment) {
+                        // Construir array de updates: Principal + Relacionados
+                        const updates = [
+                            { pid: confirmPayment.p.id, memberIndex: confirmPayment.memberIndex },
+                            ...relatedPayments.map(r => ({ pid: r.id, memberIndex: r.memberIndex }))
+                        ];
+                        onBatchTogglePayment(updates);
+                        setSnackbar({ 
+                          open: true, 
+                          message: `Se actualizaron ${updates.length} pagos`, 
+                          pid: confirmPayment.p.id,
+                          memberIndex: confirmPayment.memberIndex
+                        });
+                    } else {
+                        // Pago simple (o sin soporte de batch)
+                        onTogglePayment(confirmPayment.p.id, confirmPayment.memberIndex); 
+                        setSnackbar({ 
+                          open: true, 
+                          message: "Estado actualizado", 
+                          pid: confirmPayment.p.id,
+                          memberIndex: confirmPayment.memberIndex
+                        }); 
+                    }
+                } 
+                setConfirmPayment({ open: false, p: null }); 
+            }} 
+            sx={{ py: 1.5, borderRadius: 2, fontWeight: 700 }}
+          >
             Confirmar
           </Button>
         </DialogActions>
       </Dialog>
       <Snackbar 
         open={snackbar.open} 
-        autoHideDuration={4000} 
+        autoHideDuration={3000} 
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{ bottom: { xs: 40, sm: 40 } }}
@@ -483,7 +598,7 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
           }} 
           action={
             snackbar.pid && (
-              <Button color="inherit" size="small" onClick={() => onTogglePayment(snackbar.pid)} startIcon={<UndoIcon />} sx={{ textTransform: 'none', fontWeight: 700, ml: 1 }}>
+              <Button color="inherit" size="small" onClick={() => onTogglePayment(snackbar.pid, snackbar.memberIndex)} startIcon={<UndoIcon />} sx={{ textTransform: 'none', fontWeight: 700, ml: 1 }}>
                 Deshacer
               </Button>
             )

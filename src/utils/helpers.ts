@@ -43,5 +43,26 @@ export const triggerConfetti = () => {
     const particleCount = 50 * (timeLeft / duration);
     confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
     confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
   }, 250);
+};
+
+export const calculateCurrentTurnFromDate = (settings: AppSettings): number => {
+  if (!settings.startDate) return 1;
+  const start = new Date(settings.startDate + "T12:00:00");
+  const now = new Date();
+  
+  // Calcular diferencia de meses
+  const monthsDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  
+  if (settings.frequency === 'monthly') {
+    // Mes 0 (mismo mes) = Turno 1
+    return Math.max(1, monthsDiff + 1);
+  } else {
+    // Quincenal: Cada mes son 2 turnos
+    let turn = monthsDiff * 2;
+    // Día 1-15: Primera quincena (+1) | Día 16+: Segunda quincena (+2)
+    turn += now.getDate() <= 15 ? 1 : 2;
+    return Math.max(1, turn);
+  }
 };

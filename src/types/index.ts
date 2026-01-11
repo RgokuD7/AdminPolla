@@ -7,6 +7,7 @@ export interface PaymentStatus {
 export interface Member {
   name: string;
   phone: string;
+  bankDetails?: string; // Datos de transferencia (Banco, Tipo Cta, Numero)
   paymentHistory: PaymentStatus; // Historial indiviudal para miembros compartidos
 }
 
