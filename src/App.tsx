@@ -22,7 +22,7 @@ import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
-import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
+import { auth, onAuthStateChanged, loginWithGoogle, getRedirectResult, User } from "@/firebase";
 import { PollaService } from "@/services/firestore";
 
 const App = () => {
@@ -42,6 +42,11 @@ const App = () => {
       setIsInitializing(false);
       return;
     }
+
+    // Intentar recuperar resultado de redirect si existe
+    getRedirectResult(auth).catch((error) => {
+        console.error("Error en redirect result:", error);
+    });
 
     // Escuchar cambios de Auth
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {

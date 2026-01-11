@@ -33,7 +33,7 @@ import { AppSettings, Frequency } from "@/types";
 import { calculateCurrentTurnFromDate } from "@/utils/helpers";
 import { auth } from "../firebase";
 
-const SUPER_ADMIN_ID = "pqxrU7buzMM2Z5Mr5LS1EdkuOzi2";
+const SUPER_ADMIN_ID = import.meta.env.VITE_SUPER_ADMIN_ID;
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -155,37 +155,39 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
               />
             )}
             
-            <Divider sx={{ my: 1 }} />
-            
-            <TextField 
-              label="Turno Actual (Automático)" 
-              type="number" 
-              fullWidth 
-              disabled={!isManualTurnEnabled}
-              value={settings.currentTurn} 
-              onChange={(e) => onUpdate({ ...settings, currentTurn: Number(e.target.value) })}
-              helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
-                endAdornment: (
-                  <InputAdornment position="end">
-                     <Tooltip title="Recalcular según fecha real">
-                      <IconButton onClick={() => onUpdate({ ...settings, currentTurn: calculateCurrentTurnFromDate(settings) })} edge="end" size="small" sx={{ mr: 1 }}>
-                        <SyncIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    {auth?.currentUser?.uid === SUPER_ADMIN_ID && (
-                      <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
-                        <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
-                          {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </InputAdornment>
-                )
-              }} 
-            />
+            {auth?.currentUser?.uid === SUPER_ADMIN_ID && (
+              <>
+                <Divider sx={{ my: 1 }} />
+                
+                <TextField 
+                  label="Turno Actual (Automático)" 
+                  type="number" 
+                  fullWidth 
+                  disabled={!isManualTurnEnabled}
+                  value={settings.currentTurn} 
+                  onChange={(e) => onUpdate({ ...settings, currentTurn: Number(e.target.value) })}
+                  helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                         <Tooltip title="Recalcular según fecha real">
+                          <IconButton onClick={() => onUpdate({ ...settings, currentTurn: calculateCurrentTurnFromDate(settings) })} edge="end" size="small" sx={{ mr: 1 }}>
+                            <SyncIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        
+                        <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
+                          <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
+                            {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    )
+                  }} 
+                />
+              </>
+            )}
           </Stack>
         </Card>
 

@@ -20,15 +20,21 @@ import {
   FormControl,
   InputLabel,
   InputAdornment,
-  Grid
+  Grid,
+  LinearProgress,
+  Chip,
+  Avatar
 } from "@mui/material";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Timer as TimerIcon
+  Timer as TimerIcon,
+  Groups as GroupsIcon,
+  AttachMoney as MoneyIcon,
+  Person as PersonIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
-import { formatCurrency } from "@/utils/helpers";
+import { formatCurrency, getCollectedAmount, getParticipantName } from "@/utils/helpers";
 
 interface ListViewProps {
   groups: PollaGroup[];
@@ -58,8 +64,28 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
 
   return (
     <Container maxWidth="sm" sx={{ py: 6, pb: 12 }}>
-      <Typography variant="h4" sx={{ mb: 0.5 }}>AdminPolla</Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontWeight: 500 }}>Mis Grupos</Typography>
+      <Stack alignItems="center" spacing={2} sx={{ mb: 6, mt: 4 }}>
+        <Box 
+            component="img" 
+            src="/logo.png" 
+            sx={{ 
+                width: 140, 
+                height: 140, 
+                objectFit: 'contain',
+                // Eliminamos cualquier borde o sombra oscura fuerte
+                filter: 'drop-shadow(0px 10px 15px rgba(0,0,0,0.08))'
+            }} 
+        />
+        {/* El logo ya incluye texto a veces, pero mantenemos el texto HTML por accesibilidad y estilo consistente, 
+            o lo ocultamos si el logo tiene texto. Asumiremos que es un LOGO ICONO mayormente. */}
+        <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', color: '#1F2937' }}>
+            Admin<Box component="span" sx={{ color: '#059669' }}>Polla</Box>
+        </Typography>
+      </Stack>
+
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 800, px: 0.5 }}>
+        Mis Grupos
+      </Typography>
       
       <Stack spacing={1.5}>
         {groups.length === 0 ? (
@@ -68,27 +94,120 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             <Button variant="contained" sx={{ mt: 3, px: 4 }} onClick={() => setOpen(true)}>Crear Polla</Button>
           </Paper>
         ) : (
-          groups.map((group) => (
-            <Card key={group.id} onClick={() => onSelect(group.id)} sx={{ cursor: 'pointer', transition: 'all 0.15s', '&:active': { transform: 'translateY(1px)' } }}>
-              <CardContent sx={{ p: "16px 20px !important" }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
+          groups.map((group) => {
+            const currentTurn = group.settings.currentTurn || 1;
+            const stats = getCollectedAmount(group.participants, currentTurn, group.settings.quotaAmount);
+            const recipient = group.participants.find(p => p.turnNumber === currentTurn);
+            const isCompleted = stats.progress >= 100;
+
+            return (
+            <Card 
+                key={group.id} 
+                onClick={() => onSelect(group.id)} 
+                sx={{ 
+                    cursor: 'pointer', 
+                    transition: 'all 0.2s ease', 
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' },
+                    '&:active': { transform: 'scale(0.99)' }
+                }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                {/* Header: Nombre y Delete */}
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ color: 'text.primary' }}>{group.settings.groupName}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {FREQUENCY_LABELS[group.settings.frequency] || group.settings.frequency} • {formatCurrency(group.settings.quotaAmount)}
+                    <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{group.settings.groupName}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                       <GroupsIcon sx={{ fontSize: 14 }} /> {group.participants.length} integrantes
                     </Typography>
                   </Box>
-                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setDeleteId(group.id); }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                  <IconButton 
+                    size="small" 
+                    onClick={(e) => { e.stopPropagation(); setDeleteId(group.id); }} 
+                    sx={{ color: 'text.disabled', '&:hover': { color: 'error.main', bgcolor: '#FEE2E2' } }}
+                  >
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Stack>
+
+                {/* Info Financiera */}
+                <Stack spacing={2}>
+                    {/* Beneficiario */}
+                    <Box sx={{ bgcolor: '#F3F4F6', p: 1.5, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: isCompleted ? '#10B981' : '#3B82F6', fontSize: 14, fontWeight: 700 }}>
+                            {currentTurn}
+                        </Avatar>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+                                LE TOCA A:
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.1 }}>
+                                {recipient ? getParticipantName(recipient) : "Nadie"}
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {/* Progreso Recaudacion */}
+                    <Box>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: isCompleted ? '#059669' : 'text.secondary' }}>
+                                {isCompleted ? "¡Completo!" : "Recaudado"}
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                {formatCurrency(stats.collected)} <Typography component="span" variant="caption" color="text.secondary">/ {formatCurrency(stats.total)}</Typography>
+                            </Typography>
+                        </Stack>
+                        <LinearProgress 
+                            variant="determinate" 
+                            value={stats.progress} 
+                            sx={{ 
+                                height: 6, 
+                                borderRadius: 3, 
+                                bgcolor: '#F3F4F6',
+                                '& .MuiLinearProgress-bar': { bgcolor: isCompleted ? '#10B981' : '#3B82F6', borderRadius: 3 }
+                            }} 
+                        />
+                    </Box>
+
+                    {/* Footer Info */}
+                    <Stack direction="row" spacing={1}>
+                        <Chip 
+                            size="small" 
+                            label={FREQUENCY_LABELS[group.settings.frequency] || group.settings.frequency} 
+                            sx={{ height: 24, fontSize: '0.7rem', fontWeight: 600, bgcolor: '#EFF6FF', color: '#1D4ED8' }} 
+                        />
+                        <Chip 
+                            size="small" 
+                            icon={<MoneyIcon sx={{ fontSize: '14px !important' }} />}
+                            label={formatCurrency(group.settings.quotaAmount)} 
+                            sx={{ height: 24, fontSize: '0.7rem', fontWeight: 600, bgcolor: '#ECFDF5', color: '#047857', '& .MuiChip-icon': { color: '#047857' } }} 
+                        />
+                    </Stack>
+                </Stack>
               </CardContent>
             </Card>
-          ))
+          )})
         )}
       </Stack>
 
-      <Fab color="primary" sx={{ position: 'fixed', bottom: 32, right: 24, borderRadius: 3 }} onClick={() => setOpen(true)}>
+
+
+      <Fab 
+        sx={{ 
+            position: 'fixed', 
+            bottom: 32, 
+            right: 24, 
+            bgcolor: '#059669', 
+            color: 'white',
+            borderRadius: 3, 
+            boxShadow: '0 4px 15px rgba(5, 150, 105, 0.4)',
+            '&:hover': { bgcolor: '#047857' }
+        }} 
+        onClick={() => setOpen(true)}
+      >
         <AddIcon />
       </Fab>
 

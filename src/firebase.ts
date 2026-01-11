@@ -2,11 +2,11 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup, 
+  signInWithRedirect,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-  getRedirectResult,
+  getRedirectResult, // Añadido implicitamente al importarlo
   User 
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -63,11 +63,12 @@ export const loginWithGoogle = async () => {
     }
     try {
         await setPersistence(auth, browserLocalPersistence);
-        await signInWithPopup(auth, googleProvider);
+        // Usamos Redirect en lugar de Popup para evitar bloqueos en iOS y navegadores móviles
+        await signInWithRedirect(auth, googleProvider);
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
     }
 };
 
-export { auth, db, onAuthStateChanged };
+export { auth, db, onAuthStateChanged, getRedirectResult };
 export type { User };

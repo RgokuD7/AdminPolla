@@ -66,3 +66,41 @@ export const calculateCurrentTurnFromDate = (settings: AppSettings): number => {
     return Math.max(1, turn);
   }
 };
+
+// --- NEW HELPERS ---
+
+export const isParticipantPaid = (p: Participant, turn: number): boolean => {
+    return !!p.paymentHistory?.[turn];
+};
+
+export const isSharedMemberPaid = (p: Participant, memberIdx: number, turn: number): boolean => {
+    return !!p.members[memberIdx]?.paymentHistory?.[turn];
+};
+
+export const getCollectedAmount = (participants: Participant[], currentTurn: number, quotaAmount: number): { collected: number, total: number, progress: number } => {
+    let collected = 0;
+    const total = participants.length * quotaAmount;
+    
+    if (total === 0) return { collected: 0, total: 0, progress: 0 };
+
+    participants.forEach(p => {
+        // Ignoramos el turno del receptor para la recaudación (no se paga a sí mismo), 
+        // AUNQUE en el sistema anterior SÍ se cuenta el pago de todos los 'turnos vacíos' (pagan todos).
+        // Asumiremos que TODOS pagan, incluido el receptor (modelo ROSCA tradicional: todos ponen, uno saca).
+        
+        if (p.type === 'shared') {
+            const memberQuota = Math.floor(quotaAmount / p.members.length);
+            p.members.forEach((m, idx) => {
+                 if (m.paymentHistory?.[currentTurn]) {
+                     collected += memberQuota;
+                 }
+            });
+        } else {
+            if (p.paymentHistory?.[currentTurn]) {
+                collected += quotaAmount;
+            }
+        }
+    });
+
+    return { collected, total, progress: (collected / total) * 100 };
+};

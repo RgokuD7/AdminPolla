@@ -20,7 +20,8 @@ import {
   DialogContent,
   DialogActions,
   Checkbox,
-  FormControlLabel
+  FormControlLabel,
+  Chip
 } from "@mui/material";
 import {
   ContentCopy as ContentCopyIcon,
@@ -34,7 +35,8 @@ import {
   DoneAll as DoneAllIcon,
   FiberManualRecord as DotIcon,
   Undo as UndoIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Person as PersonIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -281,59 +283,54 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
               {stats.isFullyPaid ? "RECAUDACIÓN LISTA" : "COBRO TURNO ACTUAL"}
             </Typography>
           </Box>
-          <Box sx={{ p: 2.5 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={7}>
-                <Stack spacing={0.5}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
-                    {stats.recipient?.type === 'shared' ? 'RECEPTORES (COMPARTIDO)' : 'RECEPTOR'}
+          <Box sx={{ p: 3 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+               {/* Izquierda: Receptor */}
+               <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      {stats.recipient?.type === 'shared' ? <GroupsIcon sx={{ fontSize: 16 }} /> : <PersonIcon sx={{ fontSize: 16 }} />}
+                      {stats.recipient?.type === 'shared' ? 'RECEPTORES' : 'RECEPTOR'}
                   </Typography>
-                  <Stack direction="row" spacing={1} alignItems="flex-start">
-                    {stats.recipient?.type === 'shared' ? (
-                      <GroupsIcon sx={{ mt: 0.2, color: stats.isFullyPaid ? 'secondary.main' : 'warning.main', fontSize: 20 }} />
-                    ) : (
-                      <PaymentsIcon sx={{ mt: 0.2, color: stats.isFullyPaid ? 'secondary.main' : 'warning.main', fontSize: 20 }} />
-                    )}
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'primary.main', lineHeight: 1.2 }}>
-                        {stats.recipient ? getParticipantName(stats.recipient) : "Aún sin integrantes"}
-                      </Typography>
-                      {stats.individualAmount && (
-                        <Typography variant="caption" sx={{ color: 'secondary.main', fontWeight: 700, mt: 0.5, display: 'block' }}>
-                           ({formatCurrency(stats.individualAmount)} cada uno)
-                        </Typography>
-                      )}
-                    </Box>
-                  </Stack>
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={5}>
-                <Stack direction="row" spacing={2} sx={{ 
-                  justifyContent: { xs: 'flex-start', sm: 'flex-end' }, borderLeft: { xs: 'none', sm: '1px solid rgba(0,0,0,0.05)' }, pl: { xs: 0, sm: 2 }
-                }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>TURNO</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: 'primary.main', textAlign: { sm: 'center' } }}>#{settings.currentTurn}</Typography>
-                  </Box>
-                  <Box sx={{ textAlign: { sm: 'right' } }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block', mb: 0.5 }}>VENCIMIENTO</Typography>
-                    <Paper elevation={0} sx={{ 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: 1,
-                        bgcolor: stats.isFullyPaid ? '#DCFCE7' : '#FEE2E2', 
-                        color: stats.isFullyPaid ? '#15803d' : '#991B1B', 
-                        px: 1.5, py: 0.5, borderRadius: 2
-                    }}>
-                        <EventIcon sx={{ fontSize: 16 }} />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.9rem' }}>
-                            {formatDateReadable(stats.deadlineDate)}
-                        </Typography>
-                    </Paper>
-                  </Box>
-                </Stack>
-              </Grid>
-            </Grid>
+                  <Typography variant="h5" sx={{ mt: 1, fontWeight: 900, color: '#1F2937', letterSpacing: '-0.02em' }}>
+                       {stats.recipient ? getParticipantName(stats.recipient) : "Sin asignar"}
+                  </Typography>
+                  {stats.individualAmount && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
+                       Reciben {formatCurrency(stats.individualAmount)} cada uno
+                    </Typography>
+                  )}
+               </Box>
+
+               {/* Derecha: Turno Badge */}
+               <Paper elevation={0} sx={{ 
+                   bgcolor: 'white', px: 2, py: 1, borderRadius: 3, 
+                   border: '2px solid', borderColor: 'rgba(0,0,0,0.05)',
+                   display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 80
+               }}>
+                   <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.6rem' }}>TURNO</Typography>
+                   <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>#{settings.currentTurn}</Typography>
+               </Paper>
+            </Stack>
+
+            {/* Footer: Vencimiento */}
+            <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                   Vencimiento del plazo:
+                </Typography>
+                <Chip 
+                   icon={<EventIcon sx={{ fontSize: '18px !important' }} />}
+                   label={formatDateReadable(stats.deadlineDate)}
+                   sx={{ 
+                       height: 32,
+                       px: 1,
+                       bgcolor: stats.isFullyPaid ? '#DCFCE7' : '#FEE2E2', 
+                       color: stats.isFullyPaid ? '#15803d' : '#991B1B',
+                       fontWeight: 800,
+                       borderRadius: 2,
+                       '& .MuiChip-icon': { color: 'inherit' }
+                   }}
+                />
+            </Box>
           </Box>
         </Paper>
 
