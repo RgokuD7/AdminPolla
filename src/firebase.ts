@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect, 
+  signInWithPopup, 
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
@@ -63,11 +63,11 @@ export const loginWithGoogle = async () => {
     }
     try {
         await setPersistence(auth, browserLocalPersistence);
-        await signInWithRedirect(auth, googleProvider);
+        await signInWithPopup(auth, googleProvider);
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
     }
 };
 
-export { auth, db, onAuthStateChanged, getRedirectResult };
+export { auth, db, onAuthStateChanged };
 export type { User };

@@ -22,7 +22,7 @@ import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
-import { auth, onAuthStateChanged, loginWithGoogle, User, getRedirectResult } from "@/firebase";
+import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
 import { PollaService } from "@/services/firestore";
 
 const App = () => {
@@ -43,28 +43,9 @@ const App = () => {
       return;
     }
 
-    // Intentar recuperar resultado de redirección (Critico para iOS PWA)
-    getRedirectResult(auth).then((result) => {
-      if (result) {
-        console.log("Login exitoso tras redirección:", result.user.uid);
-        setUser(result.user);
-      }
-    }).catch((error) => {
-      console.error("Error en redirect result:", error);
-    });
-
     // Escuchar cambios de Auth
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
-      // Si onAuthStateChanged dispara null pero getRedirectResult obtuvo usuario,
-      // preferimos mantener el usuario si ya lo tenemos seteado?
-      // Generalmente onAuthStateChanged es la fuente de la verdad final.
-      if (currentUser) {
-         setUser(currentUser);
-      } else {
-         // Solo ponemos null si NO estamos esperando la info del redirectResult...
-         // Pero para simplificar, dejemos que onAuthStateChanged mande si viene despues.
-         setUser(currentUser);
-      }
+      setUser(currentUser);
       setIsInitializing(false);
     });
     return () => unsubscribe();
