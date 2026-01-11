@@ -3,7 +3,10 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithRedirect, 
-  onAuthStateChanged, 
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  getRedirectResult,
   User 
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -59,11 +62,12 @@ export const loginWithGoogle = async () => {
         return;
     }
     try {
+        await setPersistence(auth, browserLocalPersistence);
         await signInWithRedirect(auth, googleProvider);
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
     }
 };
 
-export { auth, db, onAuthStateChanged };
+export { auth, db, onAuthStateChanged, getRedirectResult };
 export type { User };
