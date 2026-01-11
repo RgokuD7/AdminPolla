@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AdminPolla - Multimanager</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "@mui/material": "https://esm.sh/@mui/material@5.15.15?deps=react@18.2.0,react-dom@18.2.0",
+    "@mui/icons-material": "https://esm.sh/@mui/icons-material@5.15.15?deps=react@18.2.0,react-dom@18.2.0",
+    "@emotion/react": "https://esm.sh/@emotion/react@11.11.4?deps=react@18.2.0,react-dom@18.2.0",
+    "@emotion/styled": "https://esm.sh/@emotion/styled@11.11.5?deps=react@18.2.0,react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+    <style>
+      body { 
+        margin: 0; 
+        padding: 0; 
+        background-color: #f0f2f5; 
+        font-family: 'Roboto', sans-serif;
+        overscroll-behavior-y: contain;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #root { min-height: 100vh; }
+      .MuiButton-root, .MuiIconButton-root, .MuiFab-root {
+        user-select: none;
+      }
+      .participant-item {
+        transition: all 0.2s ease;
+      }
+      @keyframes pulse-gold {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+      }
+      .success-pulse {
+        animation: pulse-gold 2s infinite;
+      }
+    </style>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
