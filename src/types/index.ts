@@ -3,6 +3,7 @@ export type Frequency = 'biweekly' | 'monthly';
 export interface Member {
   name: string;
   phone: string;
+  isPaid?: boolean; // Nuevo: Estado de pago individual
 }
 
 export interface Participant { 

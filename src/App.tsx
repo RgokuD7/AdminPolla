@@ -107,6 +107,47 @@ const App = () => {
   }
 
   // 2. LISTA DE GRUPOS (HOME)
+  const handleTogglePayment = (pid: string, memberIndex?: number) => {
+    if (!activeGroup) return;
+    updateActiveGroup({
+      participants: activeGroup.participants.map(p => {
+        if (p.id !== pid) return p;
+
+        // Caso 1: Pago individual en grupo compartido
+        if (p.type === 'shared' && typeof memberIndex === 'number') {
+          const newMembers = [...p.members];
+          newMembers[memberIndex] = { 
+            ...newMembers[memberIndex], 
+            isPaid: !newMembers[memberIndex].isPaid 
+          };
+          // El padre está "Completo" solo si TODOS pagaron
+          const allPaid = newMembers.every(m => m.isPaid);
+          return { ...p, members: newMembers, isPaid: allPaid };
+        } 
+        
+        // Caso 2: Pago total (click en botón principal)
+        const newIsPaid = !p.isPaid;
+        let newMembers = p.members;
+        // Si es compartido y tocamos el padre, marcamos todos los hijos igual
+        if (p.type === 'shared') {
+          newMembers = p.members.map(m => ({ ...m, isPaid: newIsPaid }));
+        }
+        return { ...p, isPaid: newIsPaid, members: newMembers };
+      })
+    });
+  };
+
+  // 1. LOGIN
+  if (!user) {
+     return (
+       <ThemeProvider theme={theme}>
+         <CssBaseline />
+         <LoginView onLogin={loginWithGoogle} />
+       </ThemeProvider>
+     );
+  }
+
+  // 2. LISTA DE GRUPOS (HOME)
   if (!activeGroupId || !activeGroup) {
     return (
       <ThemeProvider theme={theme}>
@@ -130,9 +171,7 @@ const App = () => {
           <DashboardView 
             participants={activeGroup.participants} 
             settings={activeGroup.settings} 
-            onTogglePayment={(pid) => updateActiveGroup({ 
-              participants: activeGroup.participants.map(p => p.id === pid ? {...p, isPaid: !p.isPaid} : p) 
-            })} 
+            onTogglePayment={handleTogglePayment} 
           />
         )}
         {view === 1 && (
