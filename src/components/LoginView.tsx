@@ -46,7 +46,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             component="img" 
             src="/logo.png" 
             alt="Logo AdminPolla" 
-            sx={{ width: 96, height: 96, mb: 2, borderRadius: 3, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }} 
+            sx={{ width: 220, height: 220, mb: 4, objectFit: 'contain' }} 
           />
           <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', mb: 1 }}>
             Admin<Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>

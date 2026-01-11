@@ -31,7 +31,8 @@ import {
   Timer as TimerIcon,
   Groups as GroupsIcon,
   AttachMoney as MoneyIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Logout as LogoutIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
 import { formatCurrency, getCollectedAmount, getParticipantName } from "@/utils/helpers";
@@ -41,6 +42,7 @@ interface ListViewProps {
   onSelect: (id: string) => void;
   onCreate: (s: AppSettings) => void;
   onDelete: (id: string) => void;
+  onLogout: () => void;
 }
 
 const FREQUENCY_LABELS: Record<string, string> = {
@@ -48,7 +50,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
   monthly: "Mensual"
 };
 
-const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelete }) => {
+const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelete, onLogout }) => {
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<AppSettings>({ 
@@ -63,14 +65,26 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
   });
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6, pb: 12 }}>
+    <Container maxWidth="sm" sx={{ py: 6, pb: 12, position: 'relative' }}>
+      <IconButton 
+         onClick={onLogout} 
+         sx={{ 
+           position: 'absolute', 
+           top: 12, 
+           right: 0, 
+           color: 'text.disabled',
+           '&:hover': { color: 'error.main', bgcolor: '#FEF2F2' }
+         }}
+      >
+         <LogoutIcon />
+      </IconButton>
       <Stack alignItems="center" spacing={2} sx={{ mb: 6, mt: 4 }}>
         <Box 
             component="img" 
             src="/logo.png" 
             sx={{ 
-                width: 140, 
-                height: 140, 
+                width: 200, 
+                height: 200, 
                 objectFit: 'contain',
                 // Eliminamos cualquier borde o sombra oscura fuerte
                 filter: 'drop-shadow(0px 10px 15px rgba(0,0,0,0.08))'
