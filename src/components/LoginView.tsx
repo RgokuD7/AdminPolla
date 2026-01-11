@@ -28,9 +28,15 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     setLoading(true);
     try {
       await onLogin();
-    } catch (error) {
-      console.error(error);
-      alert("Error al iniciar sesión. Verifica tu conexión.");
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      if (error?.code === 'auth/popup-blocked' || error?.message?.includes('popup')) {
+          alert("⚠️ Ventana emergente bloqueada.\n\nTu navegador bloqueó el inicio de sesión de Google. Por favor, permite las ventanas emergentes (Pop-ups) para este sitio e intenta nuevamente.");
+      } else if (error?.code === 'auth/popup-closed-by-user') {
+          console.log("Usuario canceló el login");
+      } else {
+          alert("Error al iniciar sesión. Verifica tu conexión.");
+      }
     } finally {
       setLoading(false);
     }
@@ -49,7 +55,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             sx={{ width: 220, height: 220, mb: 4, objectFit: 'contain' }} 
           />
           <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', mb: 1 }}>
-            Admin<Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
+            <Box component="span" sx={{ color: '#234574' }}>Admin</Box><Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Gestiona tus grupos de ahorro sin complicaciones.

@@ -22,7 +22,7 @@ import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
-import { auth, onAuthStateChanged, loginWithGoogle, getRedirectResult, User } from "@/firebase";
+import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { PollaService } from "@/services/firestore";
 
@@ -43,40 +43,11 @@ const App = () => {
       return;
     }
 
-    let redirectCheckDone = false;
-
-    // 1. Iniciar chequeo de Redirect
-    getRedirectResult(auth)
-      .then((result) => {
-         console.log("Redirect check complete. User:", result?.user?.uid);
-      })
-      .catch((error) => {
-         console.error("Error en redirect result:", error);
-      })
-      .finally(() => {
-         // Una vez que Firebase terminó de procesar el redirect (haya usuario o no)
-         redirectCheckDone = true;
-         // Si en este punto NO tenemos usuario, forzamos el fin de la carga.
-         // (Si SÍ tenemos usuario, onAuthStateChanged ya lo habrá manejado o lo hará en microsegundos)
-         if (!auth.currentUser) {
-            setIsInitializing(false);
-         }
-      });
-
-    // 2. Escuchar cambios de estado (Login normal / Persistencia / Éxito de Redirect)
+    // Escuchar cambios de Auth
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
       console.log("Auth State Changed. User:", currentUser?.uid);
       setUser(currentUser);
-      
-      // Si detectamos un usuario, terminamos la carga inmediatamente (éxito)
-      if (currentUser) {
-        setIsInitializing(false);
-      } 
-      // Si viene null, SOLO terminamos la carga si el chequeo de redirect ya terminó.
-      // Si el redirect sigue procesando, esperamos (el finally de arriba se encargará).
-      else if (redirectCheckDone) {
-        setIsInitializing(false);
-      }
+      setIsInitializing(false);
     });
 
     return () => unsubscribe();

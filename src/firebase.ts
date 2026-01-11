@@ -2,11 +2,10 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect,
+  signInWithPopup,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-  getRedirectResult, // Añadido implicitamente al importarlo
   User 
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -59,16 +58,17 @@ if (isConfigValid) {
 export const loginWithGoogle = async () => {
     if (!auth) {
         console.error("Auth no inicializado");
-        return;
+        throw new Error("Firebase Auth no está inicializado");
     }
     try {
         await setPersistence(auth, browserLocalPersistence);
-        // Usamos Redirect en lugar de Popup para evitar bloqueos en iOS y navegadores móviles
-        await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
+        await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
         console.error("Error al iniciar sesión:", error);
+        // Si el error es por popup bloqueado o cerrado por usuario, lo relanzamos para que la UI lo maneje
+        throw error;
     }
 };
 
-export { auth, db, onAuthStateChanged, getRedirectResult };
+export { auth, db, onAuthStateChanged };
 export type { User };
