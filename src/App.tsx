@@ -6,7 +6,8 @@ import {
   Paper,
   BottomNavigation,
   BottomNavigationAction,
-  Typography
+  Typography,
+  CircularProgress
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -15,13 +16,14 @@ import {
 } from "@mui/icons-material";
 
 import { theme } from "@/theme/theme";
-import { AppSettings, PollaGroup, Participant } from "@/types";
+import { AppSettings, PollaGroup, Participant, PaymentStatus } from "@/types";
 import ListView from "@/components/ListView";
 import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
 import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
+import { PollaService } from "@/services/firestore";
 
 const App = () => {
   // === ESTADO ===
@@ -30,6 +32,7 @@ const App = () => {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [view, setView] = useState(0); 
   const [groups, setGroups] = useState<PollaGroup[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 
   // === EFECTOS ===
   useEffect(() => {
@@ -40,7 +43,7 @@ const App = () => {
       return;
     }
 
-    // Escuchar cambios de Auth pasando la instancia 'auth'
+    // Escuchar cambios de Auth
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
       setUser(currentUser);
       setIsInitializing(false);
@@ -48,33 +51,67 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
+  // Cargar grupos desde Firestore cuando el usuario se loguea
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('adminpolla_v22_dates');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setGroups(parsed);
-      }
-    } catch(e) { console.error(e); }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('adminpolla_v22_dates', JSON.stringify(groups));
-  }, [groups]);
+    if (user) {
+      setIsLoadingGroups(true);
+      const unsubscribeGroups = PollaService.subscribeToUserPollas(user.uid, (fetchedGroups) => {
+        setGroups(fetchedGroups);
+        setIsLoadingGroups(false);
+      });
+      return () => unsubscribeGroups();
+    } else {
+      setGroups([]);
+    }
+  }, [user]);
 
   // === CALCULOS ===
   const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
 
-  // === HANDLERS ===
-  const handleCreateGroup = (settings: AppSettings) => {
-    const newGroup: PollaGroup = { id: "g-" + Date.now(), settings, participants: [], createdAt: Date.now() };
-    setGroups(prev => [...prev, newGroup]);
-    setActiveGroupId(newGroup.id);
+  // === HANDLERS FIREBASE ===
+  
+  const handleCreateGroup = async (settings: AppSettings) => {
+    if (!user) return;
+    try {
+      const newId = await PollaService.createPolla(user.uid, settings.groupName);
+      // Actualizamos settings iniciales si es necesario, aunque createPolla ya pone defaults
+      await PollaService.updateSettings(newId, settings);
+      setActiveGroupId(newId);
+    } catch (e) {
+      console.error("Error creando grupo:", e);
+    }
   };
 
-  const updateActiveGroup = useCallback((updates: Partial<PollaGroup>) => {
-    setGroups(prev => prev.map(g => g.id === activeGroupId ? { ...g, ...updates } : g));
-  }, [activeGroupId]);
+  const handleDeleteGroup = async (id: string) => {
+    try {
+      if (confirm("¿Estás seguro de eliminar este grupo?")) {
+        await PollaService.deletePolla(id);
+        if (activeGroupId === id) setActiveGroupId(null);
+      }
+    } catch (e) {
+      console.error("Error eliminando grupo:", e);
+    }
+  };
+
+  const updateActiveGroupParticipants = async (newParticipants: Participant[]) => {
+    if (!activeGroupId) return;
+    try {
+      await PollaService.updateParticipants(activeGroupId, newParticipants);
+    } catch (e) {
+      console.error("Error actualizando participantes:", e);
+    }
+  };
+  
+  const updateActiveGroupSettings = async (newSettings: AppSettings) => {
+    if (!activeGroupId) return;
+    try {
+      await PollaService.updateSettings(activeGroupId, newSettings);
+    } catch (e) {
+      console.error("Error actualizando ajustes:", e);
+    }
+  };
+
+  // === LÓGICA DE NEGOCIO LOCAL (Adaptada a Firestore & Historial de Pagos) ===
 
   const handleSetTurnByDate = (pid: string, newTurn: number) => {
     if (!activeGroup) return;
@@ -83,20 +120,71 @@ const App = () => {
     if (targetIdx === -1) return;
     const [pToMove] = sorted.splice(targetIdx, 1);
     sorted.splice(newTurn - 1, 0, pToMove);
-    updateActiveGroup({ participants: sorted.map((p, i) => ({ ...p, turnNumber: i + 1 })) });
+    
+    // Guardar en Firestore
+    updateActiveGroupParticipants(sorted.map((p, i) => ({ ...p, turnNumber: i + 1 })));
+  };
+
+  const handleTogglePayment = (pid: string, memberIndex?: number) => {
+    if (!activeGroup) return;
+    const currentTurn = activeGroup.settings.currentTurn;
+    
+    const updatedParticipants = activeGroup.participants.map(p => {
+      if (p.id !== pid) return p;
+
+      // Inicializar historial si no existe
+      const pHistory = { ...(p.paymentHistory || {}) };
+      
+      // Caso 1: Pago individual en grupo compartido
+      if (p.type === 'shared' && typeof memberIndex === 'number') {
+        const newMembers = p.members.map((m, idx) => {
+            if (idx === memberIndex) {
+                 const mHistory = { ...(m.paymentHistory || {}) };
+                 const isCurrentlyPaid = mHistory[currentTurn] || false;
+                 // Toggle
+                 mHistory[currentTurn] = !isCurrentlyPaid;
+                 return { ...m, paymentHistory: mHistory, isPaid: !isCurrentlyPaid }; // isPaid legacy opcional
+            }
+            return m;
+        });
+        
+        // El padre está "Completo" para ESTE turno solo si TODOS los hijos pagaron ESTE turno
+        const allPaidThisTurn = newMembers.every(m => m.paymentHistory?.[currentTurn]);
+        pHistory[currentTurn] = allPaidThisTurn;
+        
+        return { ...p, members: newMembers, paymentHistory: pHistory, isPaid: allPaidThisTurn };
+      } 
+      
+      // Caso 2: Pago total (Participante Simple o Click en Padre)
+      const isCurrentlyPaid = pHistory[currentTurn] || false;
+      const newPaidStatus = !isCurrentlyPaid;
+      pHistory[currentTurn] = newPaidStatus;
+      
+      let newMembers = p.members;
+      // Si es compartido y tocamos el padre, marcamos todos los hijos igual para este turno
+      if (p.type === 'shared') {
+        newMembers = p.members.map(m => {
+            const mHistory = { ...(m.paymentHistory || {}) };
+            mHistory[currentTurn] = newPaidStatus;
+            return { ...m, paymentHistory: mHistory, isPaid: newPaidStatus };
+        });
+      }
+
+      return { ...p, paymentHistory: pHistory, isPaid: newPaidStatus, members: newMembers };
+    });
+
+    updateActiveGroupParticipants(updatedParticipants);
   };
 
   // === RENDER ===
-  // 0. CARGANDO
   if (isInitializing) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-         <Typography>Cargando...</Typography>
+         <CircularProgress />
       </Box>
     );
   }
 
-  // 1. LOGIN
   if (!user) {
      return (
        <ThemeProvider theme={theme}>
@@ -106,48 +194,15 @@ const App = () => {
      );
   }
 
-  // 2. LISTA DE GRUPOS (HOME)
-  const handleTogglePayment = (pid: string, memberIndex?: number) => {
-    if (!activeGroup) return;
-    updateActiveGroup({
-      participants: activeGroup.participants.map(p => {
-        if (p.id !== pid) return p;
-
-        // Caso 1: Pago individual en grupo compartido
-        if (p.type === 'shared' && typeof memberIndex === 'number') {
-          const newMembers = [...p.members];
-          newMembers[memberIndex] = { 
-            ...newMembers[memberIndex], 
-            isPaid: !newMembers[memberIndex].isPaid 
-          };
-          // El padre está "Completo" solo si TODOS pagaron
-          const allPaid = newMembers.every(m => m.isPaid);
-          return { ...p, members: newMembers, isPaid: allPaid };
-        } 
-        
-        // Caso 2: Pago total (click en botón principal)
-        const newIsPaid = !p.isPaid;
-        let newMembers = p.members;
-        // Si es compartido y tocamos el padre, marcamos todos los hijos igual
-        if (p.type === 'shared') {
-          newMembers = p.members.map(m => ({ ...m, isPaid: newIsPaid }));
-        }
-        return { ...p, isPaid: newIsPaid, members: newMembers };
-      })
-    });
-  };
-
-  // 1. LOGIN
-  if (!user) {
-     return (
-       <ThemeProvider theme={theme}>
-         <CssBaseline />
-         <LoginView onLogin={loginWithGoogle} />
-       </ThemeProvider>
-     );
+  if (isLoadingGroups && groups.length === 0) {
+      return (
+        <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+           <Typography variant="body2" color="text.secondary">Cargando tus pollas...</Typography>
+        </Box>
+      );
   }
 
-  // 2. LISTA DE GRUPOS (HOME)
+  // 1. LISTA DE GRUPOS (HOME)
   if (!activeGroupId || !activeGroup) {
     return (
       <ThemeProvider theme={theme}>
@@ -156,13 +211,13 @@ const App = () => {
           groups={groups} 
           onSelect={setActiveGroupId} 
           onCreate={handleCreateGroup} 
-          onDelete={(id) => setGroups(prev => prev.filter(g => g.id !== id))} 
+          onDelete={handleDeleteGroup} 
         />
       </ThemeProvider>
     );
   }
 
-  // 3. VISTA DE DETALLE (DASHBOARD/TURNOS/SETTINGS)
+  // 2. VISTA DE DETALLE (DASHBOARD/TURNOS/SETTINGS)
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -178,30 +233,39 @@ const App = () => {
           <TurnsView 
             participants={activeGroup.participants} 
             settings={activeGroup.settings}
-            onUpdateSettings={(s) => updateActiveGroup({ settings: s })}
-            onAddParticipant={(p) => updateActiveGroup({ participants: [...activeGroup.participants, p] })} 
-            onUpdateParticipant={(updatedP) => updateActiveGroup({
-              participants: activeGroup.participants.map(p => p.id === updatedP.id ? updatedP : p)
-            })}
-            onRemoveParticipant={(pid) => updateActiveGroup({ 
-              participants: activeGroup.participants.filter(p => p.id !== pid).map((p, i) => ({...p, turnNumber: i+1})) 
-            })} 
-            onShuffle={() => updateActiveGroup({ 
-              participants: [...activeGroup.participants].sort(() => Math.random() - 0.5).map((p, i) => ({...p, turnNumber: i+1})) 
-            })} 
+            onUpdateSettings={updateActiveGroupSettings}
+            onAddParticipant={(p) => updateActiveGroupParticipants([...activeGroup.participants, 
+                // Asegurar que nuevos participantes tengan historial inicializado
+                {...p, paymentHistory: {}} 
+            ])} 
+            onUpdateParticipant={(updatedP) => updateActiveGroupParticipants(
+              activeGroup.participants.map(p => p.id === updatedP.id ? updatedP : p)
+            )}
+            onRemoveParticipant={(pid) => updateActiveGroupParticipants(
+              activeGroup.participants.filter(p => p.id !== pid).map((p, i) => ({...p, turnNumber: i+1}))
+            )} 
+            onShuffle={() => updateActiveGroupParticipants(
+              [...activeGroup.participants].sort(() => Math.random() - 0.5).map((p, i) => ({...p, turnNumber: i+1}))
+            )} 
             onReorder={(f, t) => { 
               const r = [...activeGroup.participants].sort((a,b) => a.turnNumber - b.turnNumber);
               const [rem] = r.splice(f, 1); 
               r.splice(t, 0, rem); 
-              updateActiveGroup({ participants: r.map((p, i) => ({...p, turnNumber: i+1})) }); 
+              updateActiveGroupParticipants(r.map((p, i) => ({...p, turnNumber: i+1}))); 
             }} 
-            onBulkImport={(newParticipants) => updateActiveGroup({ 
-              participants: [...activeGroup.participants, ...newParticipants] 
-            })} 
+            onBulkImport={(newParticipants) => updateActiveGroupParticipants(
+              [...activeGroup.participants, ...newParticipants.map(p => ({ ...p, paymentHistory: {} }))]
+            )} 
             onSetTurnByDate={handleSetTurnByDate}
           />
         )}
-        {view === 2 && <SettingsView settings={activeGroup.settings} onUpdate={(s) => updateActiveGroup({ settings: s })} onGoBack={() => { setActiveGroupId(null); setView(0); }} />}
+        {view === 2 && (
+          <SettingsView 
+            settings={activeGroup.settings} 
+            onUpdate={updateActiveGroupSettings} 
+            onGoBack={() => { setActiveGroupId(null); setView(0); }} 
+          />
+        )}
         
         <Paper sx={{ 
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, 

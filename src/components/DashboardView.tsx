@@ -56,18 +56,29 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
   const [confirmPayment, setConfirmPayment] = useState<{ open: boolean, p: Participant | null, memberIndex?: number }>({ open: false, p: null });
   const [isMarkingMode, setIsMarkingMode] = useState(false);
 
+  // Helper para saber si alguien pagó el turno actual
+  const isParticipantPaid = (p: Participant, turn: number) => {
+    // Leemos del historial de pagos
+    return p.paymentHistory?.[turn] ?? false;
+  };
+
+  const isSharedMemberPaid = (p: Participant, memberIndex: number, turn: number) => {
+    return p.members[memberIndex].paymentHistory?.[turn] ?? false; 
+  };
+
   const stats = useMemo(() => {
     const totalGoal = participants.length * settings.quotaAmount;
     
-    // Calcular recaudado considerando pagos parciales en grupos compartidos
     let collectedCount = 0;
     participants.forEach(p => {
+      // Usamos el turno ACTUAL settings.currentTurn para calcular el progreso
       if (p.type === 'shared') {
-        const paidMembers = p.members.filter(m => m.isPaid).length;
+        // En compartidos, sumamos la fracción si el miembro pagó SU parte de ESTE turno
+        const paidMembers = p.members.filter((m, idx) => isSharedMemberPaid(p, idx, settings.currentTurn)).length;
         const totalMembers = p.members.length || 1;
         collectedCount += (paidMembers / totalMembers);
       } else {
-        if (p.isPaid) collectedCount += 1;
+        if (isParticipantPaid(p, settings.currentTurn)) collectedCount += 1;
       }
     });
 
@@ -95,25 +106,29 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
   }, [stats.progress, participants.length]);
 
   const handleCopyReport = useCallback(async () => {
-    // Generar reporte detallado
+    // Generar reporte detallado usando el estado del turno actual
     const paidList = participants.map(p => {
+      const isPaid = isParticipantPaid(p, settings.currentTurn);
+      
       if (p.type === 'shared') {
-        const paidMembers = p.members.filter(m => m.isPaid).map(m => m.name);
+        const paidMembers = p.members.filter((m, idx) => isSharedMemberPaid(p, idx, settings.currentTurn)).map(m => m.name);
         if (paidMembers.length === 0) return null;
         if (paidMembers.length === p.members.length) return `✅ ${getParticipantName(p)}`;
-        return `⚠️ ${p.members.map(m => m.isPaid ? `✅ ${m.name}` : `⏳ ${m.name}`).join(' | ')}`;
+        return `⚠️ ${p.members.map((m, idx) => isSharedMemberPaid(p, idx, settings.currentTurn) ? `✅ ${m.name}` : `⏳ ${m.name}`).join(' | ')}`;
       }
-      return p.isPaid ? `✅ ${getParticipantName(p)}` : null;
+      return isPaid ? `✅ ${getParticipantName(p)}` : null;
     }).filter(Boolean).join("\n");
 
     const pendingList = participants.map(p => {
+      const isPaid = isParticipantPaid(p, settings.currentTurn);
+
       if (p.type === 'shared') {
-        const pendingMembers = p.members.filter(m => !m.isPaid).map(m => m.name);
+        const pendingMembers = p.members.filter((m, idx) => !isSharedMemberPaid(p, idx, settings.currentTurn)).map(m => m.name);
         if (pendingMembers.length === 0) return null;
         if (pendingMembers.length === p.members.length) return `⏳ ${getParticipantName(p)}`;
         return null;
       }
-      return !p.isPaid ? `⏳ ${getParticipantName(p)}` : null;
+      return !isPaid ? `⏳ ${getParticipantName(p)}` : null;
     }).filter(Boolean).join("\n");
 
     const report = `📢 *REPORTE: ${settings.groupName.toUpperCase()}*\n📅 *Vence:* ${formatDateFull(stats.deadlineDate)}\n💰 *Recaudado:* ${formatCurrency(stats.collected)} / ${formatCurrency(stats.totalGoal)}\n\n*PAGOS:*\n${paidList || "_Sin pagos_"}\n\n*PENDIENTES:*\n${pendingList || "_Todo al día!_"}\n\n👉 *Receptor:* ${stats.recipient ? getParticipantName(stats.recipient) : "N/A"}`;
@@ -158,7 +173,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                 {stats.isFullyPaid ? "¡PAGOS COMPLETADOS!" : `${Math.round(stats.progress)}% completado`}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {participants.filter(p => p.isPaid).length} de {participants.length} turnos completos
+                {participants.filter(p => isParticipantPaid(p, settings.currentTurn)).length} de {participants.length} turnos completos
               </Typography>
             </Stack>
           </Box>
@@ -238,6 +253,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
           {participants.map((p) => {
             const plazo = getDeadlineDate(calculatePaymentDate(settings, p.turnNumber), getGraceDaysForTurn(settings, p.turnNumber));
             const isShared = p.type === 'shared';
+            const isPaid = isParticipantPaid(p, settings.currentTurn);
             
             return (
               <Card 
@@ -249,8 +265,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                 sx={{ 
                   cursor: isShared ? 'default' : 'pointer',
                   transition: 'background-color 0.2s',
-                  bgcolor: isMarkingMode && p.isPaid ? "#F0FDF4" : "white",
-                  borderLeft: p.isPaid ? '4px solid #10B981' : '4px solid #F59E0B'
+                  bgcolor: isMarkingMode && isPaid ? "#F0FDF4" : "white",
+                  borderLeft: isPaid ? '4px solid #10B981' : '4px solid #F59E0B'
                 }}
               >
                 <CardContent sx={{ py: "16px !important" }}>
@@ -277,7 +293,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minHeight: 24 }}>
                               {isMarkingMode ? (
                                   // MODO RÁPIDO: Botones de Acción
-                                  p.isPaid ? (
+                                  isPaid ? (
                                       // PAGADO -> DESMARCAR
                                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#15803d' }}>
                                           <CheckCircleIcon sx={{ fontSize: 18, color: '#15803d' }} />
@@ -297,9 +313,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                               ) : (
                                   // MODO NORMAL: Estado
                                   <Stack direction="row" alignItems="center" spacing={0.5} sx={{ bgcolor: '#F9FAFB', p: 0.5, borderRadius: 1 }}>
-                                      <DotIcon sx={{ fontSize: 10, color: p.isPaid ? '#10B981' : '#F59E0B' }} />
-                                      <Typography variant="caption" sx={{ color: p.isPaid ? '#047857' : '#B45309', fontWeight: 800, letterSpacing: '0.05em' }}>
-                                        {p.isPaid ? "PAGADO" : "PENDIENTE"}
+                                      <DotIcon sx={{ fontSize: 10, color: isPaid ? '#10B981' : '#F59E0B' }} />
+                                      <Typography variant="caption" sx={{ color: isPaid ? '#047857' : '#B45309', fontWeight: 800, letterSpacing: '0.05em' }}>
+                                        {isPaid ? "PAGADO" : "PENDIENTE"}
                                       </Typography>
                                   </Stack>
                               )}
@@ -309,54 +325,57 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
 
                       {isShared && (
                         <Stack spacing={1.5} sx={{ mt: 2 }}>
-                          {p.members.map((m, idx) => (
-                            <Paper 
-                              key={idx} 
-                              variant="outlined"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onIntentToggle(p, idx);
-                              }}
-                              sx={{ 
-                                p: 1.5, px: 2, 
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                bgcolor: m.isPaid ? '#F0FDF4' : 'white', 
-                                borderColor: m.isPaid ? '#BBF7D0' : '#E5E7EB',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                '&:hover': { bgcolor: m.isPaid ? '#DCFCE7' : '#F9FAFB' }
-                              }}
-                            >
-                              <Typography variant="body1" sx={{ fontWeight: 500 }}>{m.name}</Typography>
-                              
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minHeight: 24 }}>
-                                {isMarkingMode ? (
-                                    m.isPaid ? (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#15803d' }}>
-                                            <CheckCircleIcon sx={{ fontSize: 18, color: '#15803d' }} />
-                                            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.05em' }}>DESMARCAR</Typography>
-                                        </Box>
+                          {p.members.map((m, idx) => {
+                             const isMemberPaid = isSharedMemberPaid(p, idx, settings.currentTurn);
+                             return (
+                                <Paper 
+                                  key={idx} 
+                                  variant="outlined"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onIntentToggle(p, idx);
+                                  }}
+                                  sx={{ 
+                                    p: 1.5, px: 2, 
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    bgcolor: isMemberPaid ? '#F0FDF4' : 'white', 
+                                    borderColor: isMemberPaid ? '#BBF7D0' : '#E5E7EB',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': { bgcolor: isMemberPaid ? '#DCFCE7' : '#F9FAFB' }
+                                  }}
+                                >
+                                  <Typography variant="body1" sx={{ fontWeight: 500 }}>{m.name}</Typography>
+                                  
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minHeight: 24 }}>
+                                    {isMarkingMode ? (
+                                        isMemberPaid ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#15803d' }}>
+                                                <CheckCircleIcon sx={{ fontSize: 18, color: '#15803d' }} />
+                                                <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.05em' }}>DESMARCAR</Typography>
+                                            </Box>
+                                        ) : (
+                                            <Box sx={{ 
+                                                display: 'flex', alignItems: 'center', gap: 0.5,
+                                                bgcolor: '#F3F4F6', color: '#4B5563',
+                                                px: 1, py: 0.25, borderRadius: 1
+                                            }}>
+                                                <EditIcon sx={{ fontSize: 14 }} />
+                                                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: '0.05em' }}>MARCAR</Typography>
+                                            </Box>
+                                        )
                                     ) : (
-                                        <Box sx={{ 
-                                            display: 'flex', alignItems: 'center', gap: 0.5,
-                                            bgcolor: '#F3F4F6', color: '#4B5563',
-                                            px: 1, py: 0.25, borderRadius: 1
-                                        }}>
-                                            <EditIcon sx={{ fontSize: 14 }} />
-                                            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: '0.05em' }}>MARCAR</Typography>
-                                        </Box>
-                                    )
-                                ) : (
-                                    <>
-                                      <DotIcon sx={{ fontSize: 10, color: m.isPaid ? '#10B981' : '#F59E0B' }} />
-                                      <Typography variant="caption" sx={{ color: m.isPaid ? '#047857' : '#B45309', fontWeight: 800, letterSpacing: '0.05em' }}>
-                                        {m.isPaid ? "LISTO" : "PENDIENTE"}
-                                      </Typography>
-                                    </>
-                                )}
-                              </Box>
-                            </Paper>
-                          ))}
+                                        <>
+                                          <DotIcon sx={{ fontSize: 10, color: isMemberPaid ? '#10B981' : '#F59E0B' }} />
+                                          <Typography variant="caption" sx={{ color: isMemberPaid ? '#047857' : '#B45309', fontWeight: 800, letterSpacing: '0.05em' }}>
+                                            {isMemberPaid ? "LISTO" : "PENDIENTE"}
+                                          </Typography>
+                                        </>
+                                    )}
+                                  </Box>
+                                </Paper>
+                             );
+                          })}
                         </Stack>
                       )}
                     </Box>

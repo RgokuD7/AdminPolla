@@ -120,11 +120,12 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         id: "p-" + Date.now(),
         type: isShared ? 'shared' : 'single',
         members: isShared ? [
-          { name: name1.trim(), phone: phone1.trim() },
-          { name: name2.trim(), phone: phone2.trim() }
-        ] : [{ name: name1.trim(), phone: phone1.trim() }],
-        isPaid: false,
-        turnNumber: participants.length + 1
+          { name: name1.trim(), phone: phone1.trim(), paymentHistory: {} },
+          { name: name2.trim(), phone: phone2.trim(), paymentHistory: {} }
+        ] : [{ name: name1.trim(), phone: phone1.trim(), paymentHistory: {} }],
+        isPaid: false, // Legacy
+        turnNumber: participants.length + 1,
+        paymentHistory: {}
       };
       onAddParticipant(newParticipant);
       setName1(""); setPhone1("");
@@ -214,10 +215,11 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         id: "p-bulk-" + Date.now() + i,
         type: isDuoLine ? 'shared' : 'single',
         members: isDuoLine 
-          ? [ { name: words[0], phone: "" }, { name: words[1], phone: "" } ]
-          : [ { name: line, phone: "" } ],
+          ? [ { name: words[0], phone: "", paymentHistory: {} }, { name: words[1], phone: "", paymentHistory: {} } ]
+          : [ { name: line, phone: "", paymentHistory: {} } ],
         isPaid: false,
-        turnNumber: baseIndex + i + 1
+        turnNumber: baseIndex + i + 1,
+        paymentHistory: {}
       };
     });
 

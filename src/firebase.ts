@@ -1,14 +1,27 @@
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithRedirect,
-  signOut,
-  onAuthStateChanged,
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithRedirect, 
+  onAuthStateChanged, 
   User 
 } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// Configuración de Firebase para AdminPolla Web (desde variables de entorno)
+// Definir tipos para evitar errores de TS con import.meta.env
+interface ImportMetaEnv {
+  readonly VITE_FIREBASE_API_KEY: string
+  readonly VITE_FIREBASE_AUTH_DOMAIN: string
+  readonly VITE_FIREBASE_PROJECT_ID: string
+  readonly VITE_FIREBASE_STORAGE_BUCKET: string
+  readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string
+  readonly VITE_FIREBASE_APP_ID: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -18,47 +31,39 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Validación simple para depuración
-if (!firebaseConfig.apiKey) {
-  console.error("🔥 Error Crítico: Falta la API KEY de Firebase. Verifica las variables de entorno en Vercel (.env.local en local).");
-}
+// Validar configuración antes de inicializar para evitar crash silencioso
+const isConfigValid = Object.values(firebaseConfig).every(value => value !== undefined && value !== '');
 
-// Inicializar Apps de forma segura
 let app;
-let auth;
-let googleProvider;
+let auth: any;
+let db: any;
+let googleProvider: any;
 
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  googleProvider = new GoogleAuthProvider();
-} catch (e) {
-  console.error("🔥 Error inicializando Firebase:", e);
+if (isConfigValid) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app); // Inicializamos Firestore
+    googleProvider = new GoogleAuthProvider();
+  } catch (e) {
+    console.error("🔥 Error inicializando Firebase:", e);
+  }
+} else {
+  console.warn("⚠️ Faltan variables de entorno de Firebase. La app no funcionará correctamente.");
 }
 
-// Funciones Helper de Auth
+// Wrapper para login
 export const loginWithGoogle = async () => {
-  if (!auth) throw new Error("Firebase no está inicializado.");
-  try {
-    // Usamos Redirect para mejor soporte en iOS PWA (pantalla de inicio)
-    await signInWithRedirect(auth, googleProvider);
-    // El flujo se corta aquí porque la página cambia.
-    // Al volver, onAuthStateChanged detectará el login automáticamente.
-  } catch (error) {
-    console.error("Error en login con Google:", error);
-    throw error;
-  }
+    if (!auth) {
+        console.error("Auth no inicializado");
+        return;
+    }
+    try {
+        await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+        console.error("Error al iniciar sesión:", error);
+    }
 };
 
-export const logout = async () => {
-  if (!auth) return;
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error("Error al cerrar sesión:", error);
-  }
-};
-
-// Exportar instancias para uso directo si es necesario
-export { auth, onAuthStateChanged };
+export { auth, db, onAuthStateChanged };
 export type { User };
