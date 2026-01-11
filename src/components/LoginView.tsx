@@ -22,6 +22,20 @@ const GoogleIcon = () => (
 );
 
 const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
+  const [loading, setLoading] = React.useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      await onLogin();
+    } catch (error) {
+      console.error(error);
+      alert("Error al iniciar sesión. Verifica tu conexión.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container maxWidth="xs" sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Stack spacing={4} alignItems="center" width="100%">
@@ -59,8 +73,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               fullWidth
               variant="outlined"
               size="large"
-              onClick={onLogin}
-              startIcon={<GoogleIcon />}
+              onClick={handleLogin}
+              disabled={loading}
+              startIcon={loading ? null : <GoogleIcon />}
               sx={{ 
                 py: 1.5,
                 borderRadius: 3,
@@ -76,7 +91,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 }
               }}
             >
-              Continuar con Google
+              {loading ? "Conectando..." : "Continuar con Google"}
             </Button>
             
             <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', px: 2 }}>

@@ -21,15 +21,26 @@ import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
 import LoginView from "@/components/LoginView"; 
+import { auth, onAuthStateChanged, loginWithGoogle, User } from "@/firebase";
 
 const App = () => {
   // === ESTADO ===
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [view, setView] = useState(0); 
   const [groups, setGroups] = useState<PollaGroup[]>([]);
 
   // === EFECTOS ===
+  useEffect(() => {
+    // Escuchar cambios de Auth pasando la instancia 'auth'
+    const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
+      setUser(currentUser);
+      setIsInitializing(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('adminpolla_v22_dates');
@@ -69,16 +80,21 @@ const App = () => {
   };
 
   // === RENDER ===
+  // 0. CARGANDO
+  if (isInitializing) {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+         <Typography>Cargando...</Typography>
+      </Box>
+    );
+  }
+
   // 1. LOGIN
-  if (!isLoggedIn) {
+  if (!user) {
      return (
        <ThemeProvider theme={theme}>
          <CssBaseline />
-         <LoginView onLogin={() => {
-            setIsLoggedIn(true);
-            setActiveGroupId(null);
-            setView(0);
-         }} />
+         <LoginView onLogin={loginWithGoogle} />
        </ThemeProvider>
      );
   }
