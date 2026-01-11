@@ -11,13 +11,27 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Inicializar Apps
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+// Validación simple para depuración
+if (!firebaseConfig.apiKey) {
+  console.error("🔥 Error Crítico: Falta la API KEY de Firebase. Verifica las variables de entorno en Vercel (.env.local en local).");
+}
+
+// Inicializar Apps de forma segura
+let app;
+let auth;
+let googleProvider;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+} catch (e) {
+  console.error("🔥 Error inicializando Firebase:", e);
+}
 
 // Funciones Helper de Auth
 export const loginWithGoogle = async () => {
+  if (!auth) throw new Error("Firebase no está inicializado.");
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
@@ -28,6 +42,7 @@ export const loginWithGoogle = async () => {
 };
 
 export const logout = async () => {
+  if (!auth) return;
   try {
     await signOut(auth);
   } catch (error) {

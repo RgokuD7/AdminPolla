@@ -33,6 +33,13 @@ const App = () => {
 
   // === EFECTOS ===
   useEffect(() => {
+    // Si Firebase no inicializó correctamente (ej: faltan keys), cortamos aquí
+    if (!auth) {
+      console.error("Auth no disponible");
+      setIsInitializing(false);
+      return;
+    }
+
     // Escuchar cambios de Auth pasando la instancia 'auth'
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
       setUser(currentUser);
