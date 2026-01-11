@@ -1,5 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  signOut,
+  onAuthStateChanged,
+  User 
+} from "firebase/auth";
 
 // Configuración de Firebase para AdminPolla Web (desde variables de entorno)
 const firebaseConfig = {
@@ -33,8 +40,10 @@ try {
 export const loginWithGoogle = async () => {
   if (!auth) throw new Error("Firebase no está inicializado.");
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
+    // Usamos Redirect para mejor soporte en iOS PWA (pantalla de inicio)
+    await signInWithRedirect(auth, googleProvider);
+    // El flujo se corta aquí porque la página cambia.
+    // Al volver, onAuthStateChanged detectará el login automáticamente.
   } catch (error) {
     console.error("Error en login con Google:", error);
     throw error;
