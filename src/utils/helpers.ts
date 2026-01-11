@@ -10,11 +10,6 @@ export const calculatePaymentDate = (settings: AppSettings, turn: number): strin
   const { startDate, frequency } = settings;
   const startBase = new Date(startDate + "T12:00:00");
   const turnIndex = turn - 1;
-  if (frequency === 'weekly') {
-    const date = new Date(startBase);
-    date.setDate(date.getDate() + (turnIndex * 7));
-    return date.toISOString().split('T')[0];
-  }
   let year = startBase.getFullYear(), month = startBase.getMonth();
   if (frequency === 'monthly') return new Date(year, month + turnIndex + 1, 0, 12).toISOString().split('T')[0];
   const monthOffset = Math.floor(turnIndex / 2);

@@ -19,11 +19,13 @@ import {
   Select,
   FormControl,
   InputLabel,
-  InputAdornment
+  InputAdornment,
+  Grid
 } from "@mui/material";
 import {
   Add as AddIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Timer as TimerIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
 import { formatCurrency } from "@/utils/helpers";
@@ -35,9 +37,24 @@ interface ListViewProps {
   onDelete: (id: string) => void;
 }
 
+const FREQUENCY_LABELS: Record<string, string> = {
+  biweekly: "Quincenal",
+  monthly: "Mensual"
+};
+
 const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelete }) => {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<AppSettings>({ groupName: "", quotaAmount: 20000, currentTurn: 1, frequency: 'biweekly', startDate: new Date().toISOString().split('T')[0], graceDays1: 0, graceDays2: 0, isLocked: false });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState<AppSettings>({ 
+    groupName: "", 
+    quotaAmount: 20000, 
+    currentTurn: 1, 
+    frequency: 'biweekly', 
+    startDate: new Date().toISOString().split('T')[0], 
+    graceDays1: 0, 
+    graceDays2: 0, 
+    isLocked: false 
+  });
 
   return (
     <Container maxWidth="sm" sx={{ py: 6, pb: 12 }}>
@@ -58,10 +75,10 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                   <Box>
                     <Typography variant="subtitle1" sx={{ color: 'text.primary' }}>{group.settings.groupName}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {group.settings.frequency} • {formatCurrency(group.settings.quotaAmount)}
+                      {FREQUENCY_LABELS[group.settings.frequency] || group.settings.frequency} • {formatCurrency(group.settings.quotaAmount)}
                     </Typography>
                   </Box>
-                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(group.id); }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setDeleteId(group.id); }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Stack>
@@ -75,26 +92,101 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
         <AddIcon />
       </Fab>
 
+      {/* Dialogo CREAR */}
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4 } }}>
         <DialogTitle sx={{ pt: 3, fontWeight: 800 }}>Nueva Polla</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 2 }}>
             <TextField label="Nombre del Grupo" fullWidth value={form.groupName} onChange={e => setForm({...form, groupName: e.target.value})} />
-            <TextField label="Monto Cuota" type="number" fullWidth value={form.quotaAmount} onChange={e => setForm({...form, quotaAmount: Number(e.target.value)})} InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
+            
+            <TextField 
+              label="Monto Cuota" 
+              type="text" 
+              fullWidth 
+              value={new Intl.NumberFormat('es-CL').format(form.quotaAmount)} 
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/\./g, '');
+                if (/^\d*$/.test(rawValue)) {
+                  setForm({ ...form, quotaAmount: Number(rawValue) });
+                }
+              }}
+              InputProps={{ 
+                startAdornment: <InputAdornment position="start"><Typography sx={{ color: 'text.secondary', fontWeight: 600 }}>$</Typography></InputAdornment> 
+              }} 
+            />
+
             <FormControl fullWidth>
               <InputLabel>Frecuencia</InputLabel>
               <Select label="Frecuencia" value={form.frequency} onChange={e => setForm({...form, frequency: e.target.value as Frequency})}>
-                <MenuItem value="weekly">Semanal</MenuItem>
                 <MenuItem value="biweekly">Quincenal (15 y Fin)</MenuItem>
                 <MenuItem value="monthly">Mensual (Fin)</MenuItem>
               </Select>
             </FormControl>
+
+            {form.frequency === 'biweekly' ? (
+              <Box sx={{ bgcolor: '#F9FAFB', p: 2, borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 1.5, fontWeight: 600 }}>Días de Gracia (Tolerancia)</Typography>
+                <Grid container spacing={2}>
+                   <Grid item xs={6}>
+                     <TextField 
+                        label="Día 15" 
+                        helperText="Tras día 15"
+                        type="number" 
+                        fullWidth 
+                        size="small"
+                        value={form.graceDays1} 
+                        onChange={(e) => setForm({ ...form, graceDays1: Number(e.target.value) })}
+                        InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
+                      />
+                   </Grid>
+                   <Grid item xs={6}>
+                     <TextField 
+                        label="Fin Mes" 
+                        helperText="Tras fin mes"
+                        type="number" 
+                        fullWidth 
+                        size="small"
+                        value={form.graceDays2} 
+                        onChange={(e) => setForm({ ...form, graceDays2: Number(e.target.value) })}
+                        InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
+                      />
+                   </Grid>
+                </Grid>
+              </Box>
+            ) : (
+               <TextField 
+                label="Días de Gracia" 
+                helperText="Días extra para pagar"
+                type="number" 
+                fullWidth 
+                value={form.graceDays1} 
+                onChange={(e) => setForm({ ...form, graceDays1: Number(e.target.value) })}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"><TimerIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
+                }} 
+              />
+            )}
+
             <TextField label="Fecha de Inicio" type="date" fullWidth value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} InputLabelProps={{ shrink: true }} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 1 }}>
           <Button onClick={() => setOpen(false)} color="inherit">Cerrar</Button>
           <Button variant="contained" onClick={() => { if(form.groupName.trim()) { onCreate(form); setOpen(false); } }}>Confirmar</Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Dialogo CONFIRMAR ELIMINAR */}
+      <Dialog open={!!deleteId} onClose={() => setDeleteId(null)} PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>¿Eliminar este grupo?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Esta acción no se puede deshacer. Se perderán todos los datos y el historial de pagos de este grupo.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setDeleteId(null)} color="inherit">Cancelar</Button>
+          <Button variant="contained" color="error" onClick={() => { if(deleteId) { onDelete(deleteId); setDeleteId(null); } }}>Eliminar</Button>
         </DialogActions>
       </Dialog>
     </Container>

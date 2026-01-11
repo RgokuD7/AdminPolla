@@ -20,7 +20,8 @@ import {
   InputAdornment,
   alpha,
   FormControlLabel,
-  Checkbox,
+  Switch,
+  Chip,
   List,
   ListItem,
   ListItemAvatar,
@@ -267,9 +268,9 @@ const TurnsView: React.FC<TurnsViewProps> = ({
         >
           <Stack spacing={2.5}>
             <FormControlLabel
-              control={<Checkbox size="small" checked={isShared} onChange={e => setIsShared(e.target.checked)} />}
-              label={<Typography variant="body2" color="text.secondary">👥 Es turno compartido (Pareja)</Typography>}
-              sx={{ ml: -0.5, mb: -1 }}
+              control={<Switch size="small" checked={isShared} onChange={e => setIsShared(e.target.checked)} />}
+              label={<Typography variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>👥 Turno Compartido (Pareja)</Typography>}
+              sx={{ ml: 0.5, mb: 0 }}
             />
             
             <Stack spacing={1.5}>
@@ -354,43 +355,85 @@ const TurnsView: React.FC<TurnsViewProps> = ({
           const paymentDate = calculatePaymentDate(settings, p.turnNumber);
           const dayNumber = paymentDate.split('-')[2];
           const monthShort = formatDateReadable(paymentDate).split(' ')[1].toUpperCase();
+          
+          const isPast = p.turnNumber < settings.currentTurn;
+          const isCurrent = p.turnNumber === settings.currentTurn;
 
           return (
-            <Card key={p.id} sx={{ mb: 1.5, border: '1px solid #E5E7EB', borderRadius: 2.5 }}>
+            <Card 
+              key={p.id} 
+              sx={{ 
+                mb: 1.5, 
+                border: isCurrent ? '2px solid' : '1px solid',
+                borderColor: isCurrent ? 'secondary.main' : '#E5E7EB',
+                borderRadius: 3,
+                opacity: isPast ? 0.6 : 1,
+                bgcolor: isCurrent ? '#F0FDF4' : 'white',
+                background: isPast ? '#F9FAFB' : undefined,
+                position: 'relative',
+                overflow: 'visible'
+              }}
+            >
+              {isCurrent && (
+                <Chip 
+                  label="TURNO ACTUAL" 
+                  color="secondary" 
+                  size="small" 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: -10, 
+                    right: 12, 
+                    height: 20, 
+                    fontSize: '0.65rem', 
+                    fontWeight: 800 
+                  }} 
+                />
+              )}
+              
               <ListItem 
-                sx={{ py: 1.5 }} 
+                sx={{ py: 1.5, px: 2 }} 
                 secondaryAction={
-                  <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Stack direction="row" spacing={0} alignItems="center">
                     {!settings.isLocked && (
-                      <>
-                        <IconButton size="small" disabled={idx === 0} onClick={() => onReorder(idx, idx - 1)} sx={{ borderRadius: 1.5 }}><UpIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" disabled={idx === participants.length - 1} onClick={() => onReorder(idx, idx + 1)} sx={{ borderRadius: 1.5 }}><DownIcon fontSize="small" /></IconButton>
-                      </>
+                      <Stack direction="column" sx={{ mr: 1 }}>
+                        <IconButton size="small" disabled={idx === 0} onClick={() => onReorder(idx, idx - 1)} sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}><UpIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" disabled={idx === participants.length - 1} onClick={() => onReorder(idx, idx + 1)} sx={{ p: 0.5, '&:disabled': { opacity: 0.1 } }}><DownIcon fontSize="small" /></IconButton>
+                      </Stack>
                     )}
-                    <IconButton size="small" onClick={(e) => handleOpenMenu(e, p.id)} sx={{ borderRadius: 1.5 }}><MoreVertIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={(e) => handleOpenMenu(e, p.id)} sx={{ color: 'text.secondary' }}><MoreVertIcon fontSize="small" /></IconButton>
                   </Stack>
                 }
               >
-                <ListItemAvatar sx={{ minWidth: 65, textAlign: 'center' }}>
-                  <Box>
-                    <Typography variant="caption" color="primary" sx={{ display: 'block', fontSize: '0.65rem', fontWeight: 900 }}>
+                <ListItemAvatar sx={{ minWidth: 55, textAlign: 'center', mr: 1 }}>
+                  <Box sx={{ 
+                    border: '2px solid', 
+                    borderColor: isCurrent ? 'secondary.main' : 'primary.main', 
+                    borderRadius: 2.5, 
+                    px: 0.5, py: 0.5,
+                    bgcolor: 'white' 
+                  }}>
+                    <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1, color: isCurrent ? 'secondary.main' : 'primary.main' }}>
                       {monthShort}
                     </Typography>
-                    <Avatar sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 800, fontSize: 14, width: 32, height: 32, borderRadius: 1.2, mx: 'auto', mb: 0.5 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.1rem', lineHeight: 1, color: isCurrent ? 'secondary.main' : 'primary.main' }}>
                       {dayNumber}
-                    </Avatar>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.secondary' }}>
-                      TURNO {p.turnNumber}
                     </Typography>
                   </Box>
                 </ListItemAvatar>
                 <ListItemText 
                   primary={
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: isPast ? 'text.secondary' : 'text.primary' }}>
                       {getParticipantName(p)}
                     </Typography>
                   } 
-                  secondary={p.type === 'shared' ? "Turno compartido" : null}
+                  secondary={
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, bgcolor: '#EEF2FF', color: 'primary.main', px: 0.8, py: 0.2, borderRadius: 1 }}>
+                        #{p.turnNumber}
+                      </Typography>
+                      {p.type === 'shared' && <Chip label="Compartido" size="small" variant="outlined" sx={{ height: 20, fontSize: '0.6rem', borderColor: '#E5E7EB' }} />}
+                    </Stack>
+                  }
                 />
               </ListItem>
             </Card>

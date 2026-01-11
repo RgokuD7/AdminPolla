@@ -200,13 +200,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, o
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: { sm: 'right' } }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>{stats.isFullyPaid ? "POZO TOTAL" : "VENCE"}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>VENCE EL</Typography>
                     <Typography variant="subtitle2" sx={{ 
                       fontWeight: 900, 
                       color: stats.isFullyPaid ? 'secondary.main' : 'primary.main',
-                      fontSize: stats.isFullyPaid ? '1rem' : '0.875rem'
+                      fontSize: '0.875rem'
                     }}>
-                      {stats.isFullyPaid ? formatCurrency(stats.totalGoal) : formatDateReadable(stats.deadlineDate)}
+                      {formatDateReadable(stats.deadlineDate)}
                     </Typography>
                   </Box>
                 </Stack>

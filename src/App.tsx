@@ -5,7 +5,8 @@ import {
   Box,
   Paper,
   BottomNavigation,
-  BottomNavigationAction
+  BottomNavigationAction,
+  Typography
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -19,23 +20,34 @@ import ListView from "@/components/ListView";
 import DashboardView from "@/components/DashboardView";
 import TurnsView from "@/components/TurnsView";
 import SettingsView from "@/components/SettingsView";
+import LoginView from "@/components/LoginView"; 
 
 const App = () => {
+  // === ESTADO ===
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [view, setView] = useState(0); 
   const [groups, setGroups] = useState<PollaGroup[]>([]);
 
+  // === EFECTOS ===
   useEffect(() => {
-    const saved = localStorage.getItem('adminpolla_v22_dates');
-    if (saved) setGroups(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem('adminpolla_v22_dates');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setGroups(parsed);
+      }
+    } catch(e) { console.error(e); }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('adminpolla_v22_dates', JSON.stringify(groups));
   }, [groups]);
 
+  // === CALCULOS ===
   const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
 
+  // === HANDLERS ===
   const handleCreateGroup = (settings: AppSettings) => {
     const newGroup: PollaGroup = { id: "g-" + Date.now(), settings, participants: [], createdAt: Date.now() };
     setGroups(prev => [...prev, newGroup]);
@@ -51,24 +63,42 @@ const App = () => {
     const sorted = [...activeGroup.participants].sort((a, b) => a.turnNumber - b.turnNumber);
     const targetIdx = sorted.findIndex(p => p.id === pid);
     if (targetIdx === -1) return;
-    
     const [pToMove] = sorted.splice(targetIdx, 1);
     sorted.splice(newTurn - 1, 0, pToMove);
-    
-    updateActiveGroup({ 
-      participants: sorted.map((p, i) => ({ ...p, turnNumber: i + 1 })) 
-    });
+    updateActiveGroup({ participants: sorted.map((p, i) => ({ ...p, turnNumber: i + 1 })) });
   };
 
+  // === RENDER ===
+  // 1. LOGIN
+  if (!isLoggedIn) {
+     return (
+       <ThemeProvider theme={theme}>
+         <CssBaseline />
+         <LoginView onLogin={() => {
+            setIsLoggedIn(true);
+            setActiveGroupId(null);
+            setView(0);
+         }} />
+       </ThemeProvider>
+     );
+  }
+
+  // 2. LISTA DE GRUPOS (HOME)
   if (!activeGroupId || !activeGroup) {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ListView groups={groups} onSelect={setActiveGroupId} onCreate={handleCreateGroup} onDelete={(id) => setGroups(prev => prev.filter(g => g.id !== id))} />
+        <ListView 
+          groups={groups} 
+          onSelect={setActiveGroupId} 
+          onCreate={handleCreateGroup} 
+          onDelete={(id) => setGroups(prev => prev.filter(g => g.id !== id))} 
+        />
       </ThemeProvider>
     );
   }
 
+  // 3. VISTA DE DETALLE (DASHBOARD/TURNOS/SETTINGS)
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

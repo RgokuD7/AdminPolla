@@ -1,4 +1,4 @@
-export type Frequency = 'weekly' | 'biweekly' | 'monthly';
+export type Frequency = 'biweekly' | 'monthly';
 
 export interface Member {
   name: string;
