@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { PollaGroup } from '@/types';
-import { calculatePaymentDate, formatDateReadable, getParticipantName } from '@/utils/helpers';
+import { calculatePaymentDate, formatDateReadable, getParticipantName, formatCurrency } from '@/utils/helpers';
 import { 
   Box, 
   Container, 
@@ -106,6 +106,11 @@ const PublicTurnsView = () => {
                label={`${participants.length} Participantes`} 
                size="small" 
                sx={{ bgcolor: '#F3F4F6', fontWeight: 600 }} 
+             />
+             <Chip 
+               label={`Monto Turno: ${formatCurrency(settings.quotaAmount * participants.length)}`} 
+               color="success"
+               sx={{ fontWeight: 800, mt: 0.5 }} 
              />
              <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
                 Frecuencia: {settings.frequency === 'biweekly' ? 'Quincenal' : 'Mensual'}
