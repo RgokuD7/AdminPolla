@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Reglas para la colección 'pollas'
+    match /pollas/{pollaId} {
+      
+      // LECTURA PÚBLICA:
+      // Permitimos que cualquiera con el ID (Link) pueda ver los datos básicos.
+      // Esto es necesario para la vista de invitados 'PublicTurnsView'.
+      allow read: if true;
+
+      // CREAR:
+      // 1. El usuario debe estar autenticado.
+      // 2. El campo 'userId' del nuevo documento debe coincidir con su UID.
+      allow create: if request.auth != null 
+                    && request.resource.data.userId == request.auth.uid;
+
+      // ACTUALIZAR Y BORRAR:
+      // 1. El usuario debe estar autenticado.
+      // 2. El usuario debe ser el propietario del documento existente (userId coincide).
+      allow update, delete: if request.auth != null 
+                            && resource.data.userId == request.auth.uid;
+    }
+    
+    // Bloquear acceso a cualquier otra colección no definida explícitamente
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

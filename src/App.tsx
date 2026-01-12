@@ -254,6 +254,7 @@ const App = () => {
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: "env(safe-area-inset-bottom)" }}>
         {view === 0 && (
           <DashboardView 
+            groupId={activeGroup.id}
             participants={activeGroup.participants} 
             settings={activeGroup.settings} 
             onTogglePayment={handleTogglePayment} 

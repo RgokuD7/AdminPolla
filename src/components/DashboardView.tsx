@@ -36,7 +36,8 @@ import {
   FiberManualRecord as DotIcon,
   Undo as UndoIcon,
   Event as EventIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Share as ShareIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -51,13 +52,14 @@ import {
 } from "@/utils/helpers";
 
 interface DashboardViewProps {
+  groupId: string; // Nuevo prop
   participants: Participant[];
   settings: AppSettings;
   onTogglePayment: (id: string, memberIndex?: number) => void;
   onBatchTogglePayment?: (updates: { pid: string, memberIndex?: number }[]) => void;
 }
 
-const DashboardView: React.FC<DashboardViewProps> = ({ participants, settings, onTogglePayment, onBatchTogglePayment }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ groupId, participants, settings, onTogglePayment, onBatchTogglePayment }) => {
   const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, pid: string, memberIndex?: number }>({ open: false, message: "", pid: "" });
   const [confirmPayment, setConfirmPayment] = useState<{ open: boolean, p: Participant | null, memberIndex?: number }>({ open: false, p: null });
   const [isMarkingMode, setIsMarkingMode] = useState(false);
@@ -334,15 +336,31 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
           </Box>
         </Paper>
 
-        <Button 
-          variant="outlined" 
-          fullWidth
-          onClick={handleCopyReport}
-          startIcon={<ContentCopyIcon />}
-          sx={{ mb: 4, borderRadius: 3, py: 1.5, borderColor: '#E5E7EB', color: 'text.secondary', fontWeight: 600 }}
-        >
-          Copiar Reporte de Estado
-        </Button>
+        <Stack direction="row" spacing={1} sx={{ mb: 4 }}>
+          <Button 
+            variant="outlined" 
+            fullWidth
+            onClick={handleCopyReport}
+            startIcon={<ContentCopyIcon />}
+            sx={{ borderRadius: 3, py: 1.5, borderColor: '#E5E7EB', color: 'text.secondary', fontWeight: 600 }}
+          >
+            Copiar Reporte
+          </Button>
+
+          <Button 
+            variant="contained" 
+            fullWidth
+            onClick={() => {
+                 const url = `${window.location.origin}/view/${groupId}`;
+                 navigator.clipboard.writeText(url);
+                 setSnackbar({ open: true, message: "Enlace público copiado", pid: "" });
+            }}
+            startIcon={<ShareIcon />}
+            sx={{ borderRadius: 3, py: 1.5, fontWeight: 700, bgcolor: '#3B82F6', '&:hover': { bgcolor: '#2563EB' } }}
+          >
+            Compartir Link
+          </Button>
+        </Stack>
 
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, px: 0.5 }}>
           <Typography variant="h6">Integrantes</Typography>
