@@ -23,19 +23,21 @@ const GoogleIcon = () => (
 
 const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [loading, setLoading] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const handleLogin = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       await onLogin();
     } catch (error: any) {
       console.error("Login Error:", error);
       if (error?.code === 'auth/popup-blocked' || error?.message?.includes('popup')) {
-          alert("⚠️ Ventana emergente bloqueada.\n\nTu navegador bloqueó el inicio de sesión de Google. Por favor, permite las ventanas emergentes (Pop-ups) para este sitio e intenta nuevamente.");
+          setErrorMsg("⚠️ Navegador bloqueó la ventana. Por favor permite los Pop-ups (ventanas emergentes) e intenta de nuevo.");
       } else if (error?.code === 'auth/popup-closed-by-user') {
           console.log("Usuario canceló el login");
       } else {
-          alert("Error al iniciar sesión. Verifica tu conexión.");
+          setErrorMsg("Error al iniciar sesión. Revisa tu conexión.");
       }
     } finally {
       setLoading(false);
@@ -80,6 +82,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>
               Bienvenido
             </Typography>
+
+            {errorMsg && (
+                <Box sx={{ bgcolor: '#FEF2F2', color: '#991B1B', p: 2, borderRadius: 2, fontSize: '0.85rem', fontWeight: 500, border: '1px solid #FCA5A5' }}>
+                    {errorMsg}
+                </Box>
+            )}
             
             <Button
               fullWidth
@@ -106,6 +114,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               {loading ? "Conectando..." : "Continuar con Google"}
             </Button>
             
+            <Typography variant="caption" color="text.disabled" textAlign="center" sx={{ display: 'block', px: 2, lineHeight: 1.4 }}>
+               Si la ventana no abre, verifica que no tengas bloqueados los <b>Pop-ups</b> en tu navegación.
+            </Typography>
+
             <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', px: 2 }}>
               Al continuar, aceptas nuestros Términos de Servicio y Política de Privacidad.
             </Typography>
