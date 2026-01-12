@@ -83,16 +83,17 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             component="img" 
             src="/logo.png" 
             sx={{ 
-                width: 200, 
-                height: 200, 
+                width: groups.length > 0 ? 120 : 200, 
+                height: groups.length > 0 ? 120 : 200,
                 objectFit: 'contain',
+                transition: 'all 0.5s ease', // Animación suave
                 // Eliminamos cualquier borde o sombra oscura fuerte
                 filter: 'drop-shadow(0px 10px 15px rgba(0,0,0,0.08))'
             }} 
         />
         {/* El logo ya incluye texto a veces, pero mantenemos el texto HTML por accesibilidad y estilo consistente, 
             o lo ocultamos si el logo tiene texto. Asumiremos que es un LOGO ICONO mayormente. */}
-        <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', color: '#1F2937' }}>
+        <Typography variant={groups.length > 0 ? "h4" : "h3"} sx={{ fontWeight: 900, letterSpacing: '-1px', color: '#1F2937', transition: 'all 0.3s ease' }}>
             <Box component="span" sx={{ color: '#234574' }}>Admin</Box><Box component="span" sx={{ color: '#059669' }}>Polla</Box>
         </Typography>
       </Stack>
