@@ -33,7 +33,7 @@ import { AppSettings, Frequency } from "@/types";
 import { calculateCurrentTurnFromDate } from "@/utils/helpers";
 import { auth } from "../firebase";
 
-const SUPER_ADMIN_ID = import.meta.env.VITE_SUPER_ADMIN_ID;
+
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -110,6 +110,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                  <MenuItem value="monthly">Mensual (Fin de mes)</MenuItem>
               </Select>
             </FormControl>
+            
+            <TextField 
+                label="Fecha de Inicio" 
+                type="date" 
+                fullWidth 
+                value={settings.startDate || ''} 
+                disabled={settings.currentTurn > 1}
+                onChange={e => onUpdate({...settings, startDate: e.target.value})} 
+                InputLabelProps={{ shrink: true }} 
+                helperText={settings.currentTurn > 1 ? "⚠️ No se puede editar: La polla ya está en marcha." : "Fecha de inicio del primer turno."}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start" sx={{ ml: 1, mr: 1, color: 'text.secondary' }}>📅</InputAdornment>
+                }}
+            />
 
             {settings.frequency === 'biweekly' ? (
               <Box sx={{ bgcolor: '#F9FAFB', p: 2, borderRadius: 2 }}>
@@ -155,39 +169,35 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
               />
             )}
             
-            {auth?.currentUser?.uid === SUPER_ADMIN_ID && (
-              <>
-                <Divider sx={{ my: 1 }} />
-                
-                <TextField 
-                  label="Turno Actual (Automático)" 
-                  type="number" 
-                  fullWidth 
-                  disabled={!isManualTurnEnabled}
-                  value={settings.currentTurn} 
-                  onChange={(e) => onUpdate({ ...settings, currentTurn: Number(e.target.value) })}
-                  helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
-                    endAdornment: (
-                      <InputAdornment position="end">
-                         <Tooltip title="Recalcular según fecha real">
-                          <IconButton onClick={() => onUpdate({ ...settings, currentTurn: calculateCurrentTurnFromDate(settings) })} edge="end" size="small" sx={{ mr: 1 }}>
-                            <SyncIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        
-                        <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
-                          <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
-                            {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
-                      </InputAdornment>
-                    )
-                  }} 
-                />
-              </>
-            )}
+            <Divider sx={{ my: 1 }} />
+            
+            <TextField 
+              label="Turno Actual (Automático)" 
+              type="number" 
+              fullWidth 
+              disabled={!isManualTurnEnabled}
+              value={settings.currentTurn} 
+              onChange={(e) => onUpdate({ ...settings, currentTurn: Number(e.target.value) })}
+              helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
+                endAdornment: (
+                  <InputAdornment position="end">
+                      <Tooltip title="Recalcular según fecha real">
+                      <IconButton onClick={() => onUpdate({ ...settings, currentTurn: calculateCurrentTurnFromDate(settings) })} edge="end" size="small" sx={{ mr: 1 }}>
+                        <SyncIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
+                      <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
+                        {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                )
+              }} 
+            />
           </Stack>
         </Card>
 
