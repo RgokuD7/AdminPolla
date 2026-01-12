@@ -12,15 +12,15 @@ service cloud.firestore {
 
       // CREAR:
       // 1. El usuario debe estar autenticado.
-      // 2. El campo 'userId' del nuevo documento debe coincidir con su UID.
+      // 2. El campo 'adminId' del nuevo documento debe coincidir con su UID.
       allow create: if request.auth != null 
-                    && request.resource.data.userId == request.auth.uid;
+                    && request.resource.data.adminId == request.auth.uid;
 
       // ACTUALIZAR Y BORRAR:
       // 1. El usuario debe estar autenticado.
-      // 2. El usuario debe ser el propietario del documento existente (userId coincide).
+      // 2. El usuario debe ser el propietario del documento existente (adminId coincide).
       allow update, delete: if request.auth != null 
-                            && resource.data.userId == request.auth.uid;
+                            && resource.data.adminId == request.auth.uid;
     }
     
     // Bloquear acceso a cualquier otra colección no definida explícitamente
