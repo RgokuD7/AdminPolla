@@ -108,7 +108,7 @@ const PublicTurnsView = () => {
                sx={{ bgcolor: '#F3F4F6', fontWeight: 600 }} 
              />
              <Chip 
-               label={`Monto Turno: ${formatCurrency(settings.quotaAmount * participants.length)}`} 
+               label={`Monto a Repartir: ${formatCurrency(settings.quotaAmount * participants.length)}`} 
                color="success"
                sx={{ fontWeight: 800, mt: 0.5 }} 
              />
