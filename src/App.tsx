@@ -71,17 +71,20 @@ const App = () => {
   // === CALCULOS ===
   const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
 
-  // AUTO-CRON: Verificar si el turno actual corresponde con la fecha y corregirlo si es necesario
+  // AUTO-CRON: Verificar turno AL ENTRAR al grupo.
+  // Usamos activeGroup?.id en la dependencia para que solo corra una vez por sesión de grupo
+  // y no interfiera si editamos manualmente el turno después.
   useEffect(() => {
     if (activeGroup?.settings?.startDate) {
         const realTurn = calculateCurrentTurnFromDate(activeGroup.settings);
+        // Solo corregir si hay discrepancia
         if (activeGroup.settings.currentTurn !== realTurn) {
             console.log(`🔄 Auto-corrigiendo turno: ${activeGroup.settings.currentTurn} -> ${realTurn}`);
             PollaService.updateSettings(activeGroup.id, { ...activeGroup.settings, currentTurn: realTurn })
               .catch(err => console.error("Error auto-corrigiendo turno:", err));
         }
     }
-  }, [activeGroup]);
+  }, [activeGroup?.id]);
 
   // === HANDLERS FIREBASE ===
   

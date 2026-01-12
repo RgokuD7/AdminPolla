@@ -83,8 +83,8 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             component="img" 
             src="/logo.png" 
             sx={{ 
-                width: groups.length > 0 ? 120 : 200, 
-                height: groups.length > 0 ? 120 : 200,
+                width: groups.length > 0 ? 80 : 200, 
+                height: groups.length > 0 ? 80 : 200,
                 objectFit: 'contain',
                 transition: 'all 0.5s ease', // Animación suave
                 // Eliminamos cualquier borde o sombra oscura fuerte
@@ -237,11 +237,13 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
               label="Monto Cuota" 
               type="text" 
               fullWidth 
-              value={new Intl.NumberFormat('es-CL').format(form.quotaAmount)} 
+              value={form.quotaAmount === 0 ? '' : new Intl.NumberFormat('es-CL').format(form.quotaAmount)} 
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/\./g, '');
-                if (/^\d*$/.test(rawValue)) {
-                  setForm({ ...form, quotaAmount: Number(rawValue) });
+                if (rawValue === '') {
+                   setForm({ ...form, quotaAmount: 0 });
+                } else if (/^\d*$/.test(rawValue)) {
+                   setForm({ ...form, quotaAmount: Number(rawValue) });
                 }
               }}
               InputProps={{ 
@@ -268,7 +270,7 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                         type="number" 
                         fullWidth 
                         size="small"
-                        value={form.graceDays1} 
+                        value={form.graceDays1 || ''} 
                         onChange={(e) => setForm({ ...form, graceDays1: Number(e.target.value) })}
                         InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
                       />
@@ -280,7 +282,7 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                         type="number" 
                         fullWidth 
                         size="small"
-                        value={form.graceDays2} 
+                        value={form.graceDays2 || ''} 
                         onChange={(e) => setForm({ ...form, graceDays2: Number(e.target.value) })}
                         InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
                       />
@@ -293,7 +295,7 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                 helperText="Días extra para pagar"
                 type="number" 
                 fullWidth 
-                value={form.graceDays1} 
+                value={form.graceDays1 || ''} 
                 onChange={(e) => setForm({ ...form, graceDays1: Number(e.target.value) })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><TimerIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,

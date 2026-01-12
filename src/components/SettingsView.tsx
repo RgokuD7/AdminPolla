@@ -35,6 +35,8 @@ import { auth } from "../firebase";
 
 
 
+const SUPER_ADMIN_ID = import.meta.env.VITE_SUPER_ADMIN_ID;
+
 interface SettingsViewProps {
   settings: AppSettings;
   onUpdate: (s: AppSettings) => void;
@@ -42,13 +44,48 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBack }) => {
+  const [localSettings, setLocalSettings] = React.useState<AppSettings>(settings);
   const [isManualTurnEnabled, setIsManualTurnEnabled] = React.useState(false);
+  const [hasChanges, setHasChanges] = React.useState(false);
+
+  // Detectar cambios para habilitar botón
+  React.useEffect(() => {
+     setHasChanges(JSON.stringify(settings) !== JSON.stringify(localSettings));
+  }, [localSettings, settings]);
+
+  const handleSave = () => {
+      onUpdate(localSettings);
+      // Pequeño hack para resetear estado de cambios tras update (aunque el padre renderizará de nuevo)
+      setHasChanges(false);
+  };
 
   return (
     <Container maxWidth="sm" sx={{ py: 6, pb: 16 }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 4 }}>
         <IconButtonBack onClick={onGoBack} />
         <Typography variant="h5" sx={{ fontWeight: 900 }}>Ajustes</Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button 
+            variant="outlined" 
+            color="inherit"
+            startIcon={<GroupIcon />}
+            onClick={onGoBack}
+            sx={{ 
+                borderRadius: 4, 
+                textTransform: 'none', 
+                fontWeight: 700,
+                borderWidth: 2,
+                borderColor: 'rgba(0,0,0,0.1)',
+                '&:hover': {
+                    borderWidth: 2,
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    bgcolor: 'rgba(37, 99, 235, 0.05)'
+                }
+            }}
+        >
+            Mis Pollas
+        </Button>
       </Stack>
 
       <Stack spacing={3}>
@@ -61,8 +98,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
             <TextField 
               label="Nombre del Grupo" 
               fullWidth 
-              value={settings.groupName} 
-              onChange={(e) => onUpdate({ ...settings, groupName: e.target.value })}
+              value={localSettings.groupName} 
+              onChange={(e) => setLocalSettings({ ...localSettings, groupName: e.target.value })}
               InputProps={{
                 startAdornment: <InputAdornment position="start"><GroupIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
               }}
@@ -71,13 +108,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
               label="Monto Cuota" 
               type="text" 
               fullWidth 
-              value={new Intl.NumberFormat('es-CL').format(settings.quotaAmount)} 
+              value={localSettings.quotaAmount === 0 ? '' : new Intl.NumberFormat('es-CL').format(localSettings.quotaAmount)} 
+              disabled={localSettings.currentTurn > 1}
+              helperText={localSettings.currentTurn > 1 ? "⚠️ Polla iniciada. No se puede cambiar el monto." : ""}
               onChange={(e) => {
-                // Eliminamos los puntos para obtener el numero limpio
                 const rawValue = e.target.value.replace(/\./g, '');
-                // Solo permitimos numeros
-                if (/^\d*$/.test(rawValue)) {
-                  onUpdate({ ...settings, quotaAmount: Number(rawValue) });
+                if (rawValue === '') {
+                    setLocalSettings({ ...localSettings, quotaAmount: 0 });
+                } else if (/^\d*$/.test(rawValue)) {
+                    setLocalSettings({ ...localSettings, quotaAmount: Number(rawValue) });
                 }
               }}
               InputProps={{
@@ -97,12 +136,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
               <InputLabel>Frecuencia de Pago</InputLabel>
               <Select 
                 label="Frecuencia de Pago" 
-                value={settings.frequency} 
+                value={localSettings.frequency} 
                 onChange={e => {
-                  // Al cambiar frecuencia, reiniciamos gracias si es necesario, o mantenemos.
-                  // Si cambia a mensual, podríamos querer resetear graceDays2.
                   const newFreq = e.target.value as Frequency;
-                  onUpdate({...settings, frequency: newFreq });
+                  setLocalSettings({...localSettings, frequency: newFreq });
                 }}
                 startAdornment={<InputAdornment position="start" sx={{ ml: 1, mr: 2 }}><FrequencyIcon sx={{ color: 'text.secondary' }} /></InputAdornment>}
               >
@@ -115,17 +152,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                 label="Fecha de Inicio" 
                 type="date" 
                 fullWidth 
-                value={settings.startDate || ''} 
-                disabled={settings.currentTurn > 1}
-                onChange={e => onUpdate({...settings, startDate: e.target.value})} 
+                value={localSettings.startDate || ''} 
+                disabled={localSettings.currentTurn > 1}
+                onChange={e => setLocalSettings({...localSettings, startDate: e.target.value})} 
                 InputLabelProps={{ shrink: true }} 
-                helperText={settings.currentTurn > 1 ? "⚠️ No se puede editar: La polla ya está en marcha." : "Fecha de inicio del primer turno."}
+                helperText={localSettings.currentTurn > 1 ? "⚠️ No se puede editar: La polla ya está en marcha." : "Fecha de inicio del primer turno."}
                 InputProps={{
                   startAdornment: <InputAdornment position="start" sx={{ ml: 1, mr: 1, color: 'text.secondary' }}>📅</InputAdornment>
                 }}
             />
 
-            {settings.frequency === 'biweekly' ? (
+            {localSettings.frequency === 'biweekly' ? (
               <Box sx={{ bgcolor: '#F9FAFB', p: 2, borderRadius: 2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 1.5, fontWeight: 600 }}>Días de Gracia (Tolerancia)</Typography>
                 <Grid container spacing={2}>
@@ -136,8 +173,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                         type="number" 
                         fullWidth 
                         size="small"
-                        value={settings.graceDays1} 
-                        onChange={(e) => onUpdate({ ...settings, graceDays1: Number(e.target.value) })}
+                        value={localSettings.graceDays1 || ''} 
+                        onChange={(e) => setLocalSettings({ ...localSettings, graceDays1: Number(e.target.value) })}
                         InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
                       />
                    </Grid>
@@ -148,8 +185,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                         type="number" 
                         fullWidth 
                         size="small"
-                        value={settings.graceDays2} 
-                        onChange={(e) => onUpdate({ ...settings, graceDays2: Number(e.target.value) })}
+                        value={localSettings.graceDays2 || ''} 
+                        onChange={(e) => setLocalSettings({ ...localSettings, graceDays2: Number(e.target.value) })}
                         InputProps={{ endAdornment: <InputAdornment position="end"><TimerIcon fontSize="small" /></InputAdornment> }}
                       />
                    </Grid>
@@ -161,54 +198,67 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                 helperText="Días extra de tolerancia para pagar después de la fecha de vencimiento"
                 type="number" 
                 fullWidth 
-                value={settings.graceDays1} 
-                onChange={(e) => onUpdate({ ...settings, graceDays1: Number(e.target.value) })}
+                value={localSettings.graceDays1 || ''} 
+                onChange={(e) => setLocalSettings({ ...localSettings, graceDays1: Number(e.target.value) })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><TimerIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
                 }} 
               />
             )}
             
-            <Divider sx={{ my: 1 }} />
-            
-            <TextField 
-              label="Turno Actual (Automático)" 
-              type="number" 
-              fullWidth 
-              disabled={!isManualTurnEnabled}
-              value={settings.currentTurn} 
-              onChange={(e) => onUpdate({ ...settings, currentTurn: Number(e.target.value) })}
-              helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
-                endAdornment: (
-                  <InputAdornment position="end">
-                      <Tooltip title="Recalcular según fecha real">
-                      <IconButton onClick={() => onUpdate({ ...settings, currentTurn: calculateCurrentTurnFromDate(settings) })} edge="end" size="small" sx={{ mr: 1 }}>
-                        <SyncIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
-                      <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
-                        {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                )
-              }} 
-            />
+            {auth?.currentUser?.uid === SUPER_ADMIN_ID && (
+              <>
+                <Divider sx={{ my: 1 }} />
+                
+                <TextField 
+                  label="Turno Actual (Automático)" 
+                  type="number" 
+                  fullWidth 
+                  disabled={!isManualTurnEnabled}
+                  value={localSettings.currentTurn} 
+                  onChange={(e) => setLocalSettings({ ...localSettings, currentTurn: Number(e.target.value) })}
+                  helperText={!isManualTurnEnabled ? "Calculado automáticamente según la fecha." : "Modo manual activado."}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                         <Tooltip title="Recalcular según fecha real">
+                          <IconButton onClick={() => setLocalSettings({ ...localSettings, currentTurn: calculateCurrentTurnFromDate(localSettings) })} edge="end" size="small" sx={{ mr: 1 }}>
+                            <SyncIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        
+                        <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual (Admin)"}>
+                          <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
+                            {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    )
+                  }} 
+                />
+              </>
+            )}
           </Stack>
         </Card>
 
         <Button 
-          variant="text" 
-          color="inherit"
+          variant="contained" 
+          color="primary"
           fullWidth 
-          onClick={onGoBack} 
-          sx={{ borderRadius: 3, mt: 2, color: 'text.secondary', fontWeight: 600 }}
+          size="large"
+          onClick={handleSave} 
+          disabled={!hasChanges}
+          sx={{ 
+            borderRadius: 3, 
+            mt: 4, 
+            py: 1.5, 
+            fontWeight: 700, 
+            boxShadow: hasChanges ? '0 4px 15px rgba(37, 99, 235, 0.3)' : 'none',
+            fontSize: '1rem'
+          }}
         >
-          Ir a otras pollas
+          {hasChanges ? "Guardar Cambios" : "Sin Cambios"}
         </Button>
       </Stack>
     </Container>
