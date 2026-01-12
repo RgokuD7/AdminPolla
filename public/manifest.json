@@ -1,0 +1,18 @@
+{
+  "name": "AdminPolla",
+  "short_name": "AdminPolla",
+  "description": "Gestiona tus pollas y turnos de ahorro fácilmente.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#234574",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
