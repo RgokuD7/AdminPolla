@@ -74,14 +74,41 @@ const App = () => {
   // AUTO-CRON: Verificar turno AL ENTRAR al grupo.
   // Usamos activeGroup?.id en la dependencia para que solo corra una vez por sesión de grupo
   // y no interfiera si editamos manualmente el turno después.
+  // AUTO-CRON: Verificar turno AL ENTRAR al grupo.
+  // Usamos activeGroup?.id en la dependencia para que solo corra una vez por sesión de grupo
+  // y no interfiera si editamos manualmente el turno después.
   useEffect(() => {
     if (activeGroup?.settings?.startDate) {
         const realTurn = calculateCurrentTurnFromDate(activeGroup.settings);
+        const currentTurn = activeGroup.settings.currentTurn;
+
         // Solo corregir si hay discrepancia
-        if (activeGroup.settings.currentTurn !== realTurn) {
-            console.log(`🔄 Auto-corrigiendo turno: ${activeGroup.settings.currentTurn} -> ${realTurn}`);
-            PollaService.updateSettings(activeGroup.id, { ...activeGroup.settings, currentTurn: realTurn })
-              .catch(err => console.error("Error auto-corrigiendo turno:", err));
+        if (currentTurn !== realTurn) {
+            
+            // Si debemos AVANZAR, verificar que el turno actual esté PAGADO
+            if (realTurn > currentTurn) {
+                const isCurrentFullyPaid = activeGroup.participants.every(p => {
+                     if (p.type === 'shared') {
+                          // En compartidos, todos deben haber pagado
+                          return p.members.every(m => m.paymentHistory?.[currentTurn]);
+                     }
+                     // En individuales, validar su historial
+                     return p.paymentHistory?.[currentTurn];
+                });
+
+                if (isCurrentFullyPaid) {
+                     console.log(`🔄 Auto-corrigiendo turno (Avance): ${currentTurn} -> ${realTurn}`);
+                     PollaService.updateSettings(activeGroup.id, { ...activeGroup.settings, currentTurn: realTurn })
+                      .catch(err => console.error("Error auto-corrigiendo turno:", err));
+                } else {
+                     console.log(`🛑 Bloqueo Auto-avance: Turno ${currentTurn} incompleto. Se requiere pago total para avanzar automáticamente.`);
+                }
+            } else {
+                // Si realTurn < currentTurn (Retroceso por cambio de fecha), permitimos corregir siempre
+                console.log(`🔄 Auto-corrigiendo turno (Retroceso): ${currentTurn} -> ${realTurn}`);
+                PollaService.updateSettings(activeGroup.id, { ...activeGroup.settings, currentTurn: realTurn })
+                  .catch(err => console.error("Error auto-corrigiendo turno:", err));
+            }
         }
     }
   }, [activeGroup?.id]);

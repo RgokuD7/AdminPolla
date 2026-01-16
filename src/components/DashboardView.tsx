@@ -21,7 +21,8 @@ import {
   DialogActions,
   Checkbox,
   FormControlLabel,
-  Chip
+  Chip,
+  TextField
 } from "@mui/material";
 import {
   ContentCopy as ContentCopyIcon,
@@ -37,7 +38,8 @@ import {
   Undo as UndoIcon,
   Event as EventIcon,
   Person as PersonIcon,
-  Share as ShareIcon
+  Share as ShareIcon,
+  Search as SearchIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -48,7 +50,8 @@ import {
   getGraceDaysForTurn, 
   getDeadlineDate, 
   getParticipantName, 
-  triggerConfetti 
+  triggerConfetti,
+  calculateCurrentTurnFromDate 
 } from "@/utils/helpers";
 
 interface DashboardViewProps {
@@ -63,6 +66,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ groupId, participants, se
   const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, pid: string, memberIndex?: number }>({ open: false, message: "", pid: "" });
   const [confirmPayment, setConfirmPayment] = useState<{ open: boolean, p: Participant | null, memberIndex?: number }>({ open: false, p: null });
   const [isMarkingMode, setIsMarkingMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Estado para pagos relacionados (misma persona, otros turnos)
   const [relatedPayments, setRelatedPayments] = useState<{ id: string, memberIndex?: number, turnNumber: number }[]>([]);
@@ -119,20 +123,31 @@ const DashboardView: React.FC<DashboardViewProps> = ({ groupId, participants, se
 
   const handleCopyReport = useCallback(async () => {
     // Generar reporte detallado usando el estado del turno actual
-    const paidList = participants.map(p => {
-      const isPaid = isParticipantPaid(p, settings.currentTurn);
-      
-      if (p.type === 'shared') {
-        const paidMembers = p.members.filter((m, idx) => isSharedMemberPaid(p, idx, settings.currentTurn)).map(m => m.name);
-        if (paidMembers.length === 0) return null;
-        if (paidMembers.length === p.members.length) return `✅ ${getParticipantName(p)}`;
-        return `⚠️ ${p.members.map((m, idx) => isSharedMemberPaid(p, idx, settings.currentTurn) ? `✅ ${m.name}` : `⏳ ${m.name}`).join(' | ')}`;
-      }
-      return isPaid ? `✅ ${getParticipantName(p)}` : null;
-    }).filter(Boolean).join("\n");
+    
+    // 1. Construir lista de PAGADOS (Individuales + Miembros de compartidos que sí pagaron)
+    const paidNames: string[] = [];
+    
+    participants.forEach(p => {
+        if (p.type === 'shared') {
+            // Filtrar solo los miembros que pagaron
+            p.members.forEach((m, idx) => {
+                if (isSharedMemberPaid(p, idx, settings.currentTurn)) {
+                    paidNames.push(`✅ ${m.name}`);
+                }
+            });
+        } else {
+            // Individual
+            if (isParticipantPaid(p, settings.currentTurn)) {
+                paidNames.push(`✅ ${getParticipantName(p)}`);
+            }
+        }
+    });
 
-    // Agrupar deudas por nombre para mostrar totales consolidados
+    const paidList = paidNames.length > 0 ? paidNames.join("\n") : "_Nadie ha pagado aún_";
+
+    // 2. Agrupar deudas por nombre para mostrar totales consolidados
     const debts: Record<string, number> = {};
+    const pendingNames: string[] = [];
 
     participants.forEach(p => {
       if (p.type === 'shared') {
@@ -141,24 +156,24 @@ const DashboardView: React.FC<DashboardViewProps> = ({ groupId, participants, se
           if (!isSharedMemberPaid(p, idx, settings.currentTurn)) {
              const nameKey = m.name.trim(); 
              debts[nameKey] = (debts[nameKey] || 0) + amountPerMember;
+             pendingNames.push(nameKey); // Para saber quién falta sin formateo de dinero si se prefiere
           }
         });
       } else {
         if (!isParticipantPaid(p, settings.currentTurn)) {
-           // Usamos el nombre del primer miembro si es single (que debería ser el único)
            const nameKey = p.members[0].name.trim();
            debts[nameKey] = (debts[nameKey] || 0) + settings.quotaAmount;
         }
       }
     });
 
-    const pendingList = Object.entries(debts)
-      .map(([name, amount]) => `⏳ ${name}: ${formatCurrency(amount)}`)
+    const pendingListFormatted = Object.entries(debts)
+      .map(([name, amount]) => `⏳ ${name} (${formatCurrency(amount)})`) // Formato más limpio: Nombre (Monto)
       .sort((a, b) => a.localeCompare(b))
       .join("\n");
 
-    const report = `� *ESTADO ${settings.groupName.toUpperCase()}*
-� *Vencimiento:* ${formatDateFull(stats.deadlineDate)}
+    const report = `📢 *ESTADO ${settings.groupName.toUpperCase()}*
+🗓 *Vencimiento:* ${formatDateFull(stats.deadlineDate)}
 
 💰 *Meta:* ${formatCurrency(stats.totalGoal)}
 📈 *Avance:* ${Math.round(stats.progress)}% (${formatCurrency(stats.collected)})
@@ -167,19 +182,19 @@ const DashboardView: React.FC<DashboardViewProps> = ({ groupId, participants, se
 👉 *${stats.recipient ? getParticipantName(stats.recipient).toUpperCase() : "POR DEFINIR"}*
 
 ━━━━━━━━━━━━━━━━━━━━
-
 ✅ *PAGOS CONFIRMADOS:*
-${paidList || "_Nadie ha pagado aún_"}
+${paidList}
 
 ━━━━━━━━━━━━━━━━━━━━
+⏳ *FALTAN POR PAGAR:*
+${pendingListFormatted || "🎉 _¡Todos están al día!_"}
+${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
 
-⏳ *PENDIENTES:*
-${pendingList || "🎉 _¡Todos están al día!_"}
-${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
+🔗 *Ver detalle:* ${window.location.origin}/view/${groupId}`;
     
     await navigator.clipboard.writeText(report);
     setSnackbar({ open: true, message: "Reporte copiado al portapapeles", pid: "" });
-  }, [participants, settings, stats]);
+  }, [participants, settings, stats, groupId]);
 
   const onIntentToggle = (p: Participant, memberIndex?: number) => {
     // 1. Determinar estado ACTUAL y Nombre del objetivo
@@ -236,6 +251,17 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
     setConfirmPayment({ open: true, p, memberIndex });
   };
 
+  const filteredParticipants = useMemo(() => {
+    if (!searchQuery) return participants;
+    const lower = searchQuery.toLowerCase();
+    return participants.filter(p => {
+       if (p.type === 'shared') {
+          return p.members.some(m => m.name.toLowerCase().includes(lower));
+       }
+       return p.members[0].name.toLowerCase().includes(lower);
+    });
+  }, [participants, searchQuery]);
+
   return (
     <Box sx={{ pb: 16 }}>
       <Box sx={{ bgcolor: "white", pt: 6, pb: 6, px: 3, borderBottom: '1px solid #E5E7EB' }}>
@@ -273,6 +299,24 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
       </Box>
 
       <Container maxWidth="sm" sx={{ mt: 3 }}>
+        
+        {(() => {
+            const realTurn = calculateCurrentTurnFromDate(settings);
+            if (realTurn > settings.currentTurn) {
+                return (
+                    <Alert 
+                        severity="error" 
+                        variant="filled"
+                        icon={<EventIcon fontSize="inherit" />}
+                        sx={{ mb: 3, borderRadius: 3, fontWeight: 700, boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)' }}
+                    >
+                        ¡PAGOS ATRASADOS! Según la fecha, deberíamos ir en el Turno {realTurn}. No se avanzará hasta completar los pagos.
+                    </Alert>
+                );
+            }
+            return null;
+        })()}
+
         <Paper className={stats.isFullyPaid ? "success-pulse" : ""} sx={{ 
           mb: 4, borderRadius: 4, transition: 'all 0.3s ease', position: 'relative', overflow: 'hidden',
           bgcolor: stats.isFullyPaid ? '#F0FDF4' : '#FFFBEB', 
@@ -374,8 +418,20 @@ ${pendingList ? `\n⚠️ *Regularizar a la brevedad.*` : ""}`;
           </Button>
         </Stack>
 
+        <TextField
+            fullWidth
+            placeholder="Buscar integrante..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+            }}
+            sx={{ mb: 2, bgcolor: 'white', borderRadius: 2 }}
+            size="small"
+        />
+
         <Stack spacing={1.5}>
-          {participants.map((p) => {
+          {filteredParticipants.map((p) => {
             const plazo = getDeadlineDate(calculatePaymentDate(settings, p.turnNumber), getGraceDaysForTurn(settings, p.turnNumber));
             const isShared = p.type === 'shared';
             const isPaid = isParticipantPaid(p, settings.currentTurn);
