@@ -71,6 +71,18 @@ const App = () => {
   // === CALCULOS ===
   const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
 
+  // Flag derivado: ¿el turno actual está 100% pagado?
+  const isCurrentTurnFullyPaid = useMemo(() => {
+    if (!activeGroup || activeGroup.participants.length === 0) return false;
+    const turn = activeGroup.settings.currentTurn;
+    return activeGroup.participants.every(p => {
+      if (p.type === 'shared') {
+        return p.members.every(m => m.paymentHistory?.[turn]);
+      }
+      return p.paymentHistory?.[turn];
+    });
+  }, [activeGroup?.participants, activeGroup?.settings.currentTurn]);
+
   // AUTO-CRON: Verificar turno AL ENTRAR al grupo.
   // Usamos activeGroup?.id en la dependencia para que solo corra una vez por sesión de grupo
   // y no interfiera si editamos manualmente el turno después.
@@ -111,7 +123,7 @@ const App = () => {
             }
         }
     }
-  }, [activeGroup?.id]);
+  }, [activeGroup?.id, isCurrentTurnFullyPaid]);
 
   // === HANDLERS FIREBASE ===
   
