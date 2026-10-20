@@ -19,7 +19,7 @@ import {
   FormControlLabel,
   Chip,
   TextField,
-  Collapse
+  Divider
 } from "@mui/material";
 import {
   ContentCopy as ContentCopyIcon,
@@ -36,8 +36,7 @@ import {
   Share as ShareIcon,
   Search as SearchIcon,
   AccountBalance as BankIcon,
-  Check as CheckIcon,
-  ExpandMore as ExpandMoreIcon
+  Check as CheckIcon
 } from "@mui/icons-material";
 import { AppSettings, Participant } from "@/types";
 import { 
@@ -79,7 +78,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   const [isMarkingMode, setIsMarkingMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
-  const [expandedShared, setExpandedShared] = useState<Record<string, boolean>>({});
 
   const [relatedPayments, setRelatedPayments] = useState<{ id: string, memberIndex?: number, turnNumber: number }[]>([]);
   const [payRelated, setPayRelated] = useState(false);
@@ -270,131 +268,152 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
     }
   };
 
+  // Cuotas pagadas totales
+  const paidCount = participants.filter(p => isParticipantPaid(p, settings.currentTurn)).length;
+
   return (
     <Box sx={{ pb: 16 }}>
-      {/* ─── Encabezado de Recaudación (CLARO en Modo Día, Oscuro en Modo Noche) ─── */}
+      {/* ─── Encabezado de Recaudación (Limpio y Claro en Modo Día) ─── */}
       <Box 
         sx={{ 
-          pt: 3.5, 
-          pb: 3.5, 
+          pt: 3, 
+          pb: 3, 
           px: 2.5, 
           bgcolor: 'background.paper',
           borderBottom: 1,
-          borderColor: 'divider',
-          transition: 'background-color 0.2s ease'
+          borderColor: 'divider'
         }}
       >
         <Container maxWidth="sm" disableGutters>
           <Stack spacing={2}>
-            {/* Header: Nombre del grupo y Turno */}
+            {/* Header: Nombre del grupo y Badge del Turno Actual */}
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: 'text.secondary', 
-                  fontWeight: 700, 
-                  letterSpacing: '0.05em'
-                }}
-              >
-                {settings.groupName || "Mi Polla"}
-              </Typography>
+              <Box>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: 'text.secondary', 
+                    fontWeight: 700, 
+                    letterSpacing: '0.04em'
+                  }}
+                >
+                  GRUPO ACTIVO
+                </Typography>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 900, 
+                    color: 'text.primary',
+                    lineHeight: 1.1
+                  }}
+                >
+                  {settings.groupName || "Mi Polla"}
+                </Typography>
+              </Box>
+
               <Chip
-                label={`Turno #${settings.currentTurn}`}
+                label={`TURNO #${settings.currentTurn}`}
                 size="small"
                 sx={{
                   bgcolor: stats.isFullyPaid ? 'surface.paid' : 'surface.muted',
                   color: stats.isFullyPaid ? 'secondary.main' : 'text.primary',
                   fontWeight: 800,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                   border: 1,
-                  borderColor: 'divider'
+                  borderColor: stats.isFullyPaid ? 'secondary.main' : 'divider'
                 }}
               />
             </Stack>
 
-            {/* Monto Recaudado y Meta */}
-            <Box>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: 'text.secondary', 
-                  fontWeight: 600, 
-                  letterSpacing: '0.04em',
-                  display: 'block',
-                  mb: 0.25
-                }}
-              >
-                RECAUDACIÓN TURNO ACTUAL
-              </Typography>
-              <Stack direction="row" alignItems="baseline" spacing={1} flexWrap="wrap">
-                <Typography 
-                  variant="h3" 
-                  component="span"
-                  sx={{ 
-                    fontWeight: 900, 
-                    color: stats.isFullyPaid ? 'secondary.main' : 'text.primary',
-                    fontSize: { xs: '2.2rem', sm: '2.8rem' },
-                    lineHeight: 1.1
-                  }}
-                >
-                  {formatCurrency(stats.collected)}
-                </Typography>
-                <Typography 
-                  variant="subtitle1" 
-                  component="span"
-                  sx={{ 
-                    color: 'text.secondary', 
-                    fontWeight: 600 
-                  }}
-                >
-                  / {formatCurrency(stats.totalGoal)}
-                </Typography>
-                {stats.isFullyPaid && (
-                  <IconButton 
-                    size="small" 
-                    onClick={() => triggerConfetti()} 
-                    sx={{ color: 'warning.main', ml: 0.5 }}
-                  >
-                    <CelebrationIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Stack>
-            </Box>
+            {/* Panel de Métricas Financieras (KPIs limpios) */}
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: stats.isFullyPaid ? 'surface.paid' : 'surface.muted',
+                border: 1,
+                borderColor: stats.isFullyPaid ? 'secondary.main' : 'divider'
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="baseline">
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>
+                      RECAUDACIÓN ACTUAL
+                    </Typography>
+                    <Stack direction="row" alignItems="baseline" spacing={0.75}>
+                      <Typography 
+                        variant="h4" 
+                        sx={{ 
+                          fontWeight: 900, 
+                          color: stats.isFullyPaid ? 'secondary.main' : 'text.primary',
+                          lineHeight: 1.1,
+                          fontSize: { xs: '1.9rem', sm: '2.3rem' }
+                        }}
+                      >
+                        {formatCurrency(stats.collected)}
+                      </Typography>
+                      {stats.isFullyPaid && (
+                        <IconButton 
+                          size="small" 
+                          onClick={() => triggerConfetti()} 
+                          sx={{ color: 'warning.main', p: 0.5 }}
+                        >
+                          <CelebrationIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Box>
 
-            {/* Barra de Progreso */}
-            <Box>
-              <LinearProgress 
-                variant="determinate" 
-                value={Math.min(stats.progress, 100)} 
-                sx={{ 
-                  height: 6, 
-                  borderRadius: 3, 
-                  bgcolor: 'surface.muted', 
-                  '& .MuiLinearProgress-bar': { 
-                    bgcolor: stats.isFullyPaid ? 'success.main' : 'secondary.main',
-                    borderRadius: 3 
-                  } 
-                }} 
-              />
-              <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    color: stats.isFullyPaid ? 'secondary.main' : 'text.secondary', 
-                    fontWeight: 700,
-                    fontSize: '0.75rem' 
-                  }}
-                >
-                  {stats.isFullyPaid ? "🎉 ¡100% RECAUDADO!" : `${Math.round(stats.progress)}% completado`}
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}
-                >
-                  {participants.filter(p => isParticipantPaid(p, settings.currentTurn)).length} de {participants.length} cuotas completas
-                </Typography>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>
+                      META TOTAL
+                    </Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.secondary', lineHeight: 1.1 }}>
+                      {formatCurrency(stats.totalGoal)}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                {/* Barra de Progreso y Porcentaje */}
+                <Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={Math.min(stats.progress, 100)} 
+                    sx={{ 
+                      height: 7, 
+                      borderRadius: 3.5, 
+                      bgcolor: 'background.paper', 
+                      border: 1,
+                      borderColor: 'divider',
+                      '& .MuiLinearProgress-bar': { 
+                        bgcolor: stats.isFullyPaid ? 'success.main' : 'secondary.main',
+                        borderRadius: 3.5 
+                      } 
+                    }} 
+                  />
+                  <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        color: stats.isFullyPaid ? 'secondary.main' : 'text.primary', 
+                        fontWeight: 800,
+                        fontSize: '0.72rem' 
+                      }}
+                    >
+                      {stats.isFullyPaid ? "🎉 ¡100% RECAUDADO!" : `${Math.round(stats.progress)}% recaudado`}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.72rem' }}
+                    >
+                      {paidCount} de {participants.length} cuotas al día
+                    </Typography>
+                  </Stack>
+                </Box>
               </Stack>
-            </Box>
+            </Paper>
           </Stack>
         </Container>
       </Box>
@@ -412,10 +431,9 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 variant="filled"
                 icon={<EventIcon fontSize="inherit" />}
                 sx={{ 
-                  mb: 2.5, 
+                  mb: 2, 
                   borderRadius: 2, 
-                  fontWeight: 700, 
-                  boxShadow: 'none' 
+                  fontWeight: 700 
                 }}
               >
                 ¡PAGOS ATRASADOS! Según la fecha, deberíamos ir en el Turno #{realTurn}. No avanzará hasta completar los pagos.
@@ -425,11 +443,11 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           return null;
         })()}
 
-        {/* ─── Card del Receptor (Bordes Sobrios 8-10px) ─── */}
+        {/* ─── Card del Beneficiario / Receptor ─── */}
         <Paper 
           sx={{ 
             mb: 2.5, 
-            borderRadius: 2.5, 
+            borderRadius: 2, 
             overflow: 'hidden',
             border: 1,
             borderColor: stats.isFullyPaid ? 'secondary.main' : 'divider',
@@ -461,8 +479,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               </Typography>
             </Stack>
             <Chip 
-              icon={<EventIcon sx={{ fontSize: '14px !important' }} />}
-              label={formatDateReadable(stats.deadlineDate)}
+              icon={<EventIcon sx={{ fontSize: '13px !important' }} />}
+              label={`Plazo: ${formatDateReadable(stats.deadlineDate)}`}
               size="small"
               sx={{ 
                 height: 22,
@@ -516,7 +534,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   bgcolor: 'surface.muted', 
                   px: 1.5, 
                   py: 1, 
-                  borderRadius: 2, 
+                  borderRadius: 1.5, 
                   border: 1, 
                   borderColor: 'divider',
                   display: 'flex', 
@@ -530,7 +548,6 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               </Paper>
             </Stack>
 
-            {/* Botón para copiar datos bancarios */}
             {recipientBankDetails && (
               <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
                 <Button
@@ -540,8 +557,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   onClick={handleCopyBank}
                   startIcon={copiedBank ? <CheckIcon color="success" /> : <BankIcon />}
                   sx={{
-                    borderRadius: 2,
-                    py: 0.8,
+                    borderRadius: 1.5,
+                    py: 0.75,
                     borderColor: 'divider',
                     color: 'text.primary',
                     fontWeight: 700,
@@ -557,7 +574,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           </Box>
         </Paper>
 
-        {/* ─── Botones de Acción (Copiar / Compartir) ─── */}
+        {/* ─── Botones de Acción (Copiar Reporte / Compartir Enlace) ─── */}
         <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
           <Button 
             variant="outlined" 
@@ -566,7 +583,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             startIcon={<ContentCopyIcon />}
             sx={{ 
               borderRadius: 2, 
-              py: 1.2, 
+              py: 1.25, 
+              minHeight: 46,
               borderColor: 'divider', 
               color: 'text.primary', 
               fontWeight: 700,
@@ -588,7 +606,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             startIcon={<ShareIcon />}
             sx={{ 
               borderRadius: 2, 
-              py: 1.2, 
+              py: 1.25, 
+              minHeight: 46,
               fontWeight: 700, 
               bgcolor: 'accent.main',
               color: '#FFFFFF',
@@ -599,14 +618,14 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           </Button>
         </Stack>
 
-        {/* ─── Lista de Integrantes (Diseño Sobrio y Limpio) ─── */}
+        {/* ─── Lista de Integrantes y Pagos ─── */}
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, px: 0.5 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography variant="h6" sx={{ fontWeight: 800 }}>Integrantes</Typography>
             <Chip 
-              label={participants.length} 
+              label={`${participants.length} turnos`} 
               size="small" 
-              sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.72rem', height: 22 }} 
+              sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.72rem', height: 22, borderRadius: 1.5 }} 
             />
           </Stack>
           <Button 
@@ -631,7 +650,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
         {/* Buscador */}
         <TextField
           fullWidth
-          placeholder="Buscar por nombre..."
+          placeholder="Buscar integrante..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
@@ -648,10 +667,10 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           size="small"
         />
 
-        {/* Contenedor de Integrantes con curvas sobrias */}
+        {/* ─── Contenedor de Participantes (Sin colapsar, ambos miembros visibles directamente) ─── */}
         <Paper 
           sx={{ 
-            borderRadius: 2.5, 
+            borderRadius: 2, 
             overflow: 'hidden', 
             border: 1, 
             borderColor: 'divider',
@@ -670,19 +689,13 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               const isPaid = isParticipantPaid(p, settings.currentTurn);
               const isRecipient = p.turnNumber === settings.currentTurn;
               const hasDivider = idx < filteredParticipants.length - 1;
-              const isExpanded = !!expandedShared[p.id];
 
-              return (
-                <Box key={p.id}>
-                  {/* Fila del Participante */}
+              // RENDERIZADO PARTICIPANTE INDIVIDUAL
+              if (!isShared) {
+                return (
                   <Box
-                    onClick={() => {
-                      if (isShared) {
-                        setExpandedShared(prev => ({ ...prev, [p.id]: !prev[p.id] }));
-                        return;
-                      }
-                      onIntentToggle(p);
-                    }}
+                    key={p.id}
+                    onClick={() => onIntentToggle(p)}
                     sx={{
                       p: 1.75,
                       display: 'flex',
@@ -694,11 +707,11 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                       '&:hover': {
                         bgcolor: isPaid ? 'surface.paid' : 'surface.muted'
                       },
-                      borderBottom: hasDivider || (isShared && isExpanded) ? 1 : 0,
+                      borderBottom: hasDivider ? 1 : 0,
                       borderColor: 'divider'
                     }}
                   >
-                    {/* Avatar con número de turno */}
+                    {/* Avatar de Turno */}
                     <Avatar 
                       sx={{ 
                         width: 34, 
@@ -719,95 +732,60 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
 
                     {/* Nombre y detalles */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" spacing={0.75} alignItems="center">
-                        <Typography 
-                          variant="subtitle1" 
-                          sx={{ 
-                            fontWeight: 700, 
-                            lineHeight: 1.2,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          {isShared ? p.members.map(m => m.name).join(' y ') : p.members[0].name}
-                        </Typography>
-                        {isShared && (
-                          <Chip 
-                            label="Compartido" 
-                            size="small" 
-                            sx={{ 
-                              height: 18, 
-                              fontSize: '0.62rem', 
-                              fontWeight: 700,
-                              bgcolor: 'surface.muted',
-                              color: 'text.secondary' 
-                            }} 
-                          />
-                        )}
-                      </Stack>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {p.members[0].name}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem', mt: 0.2, display: 'block' }}>
-                        Turno #{p.turnNumber} {isRecipient ? '• 👑 Receptor actual' : ''}
+                        Turno #{p.turnNumber} • Cuota: {formatCurrency(settings.quotaAmount)} {isRecipient ? '• 👑 Beneficiario' : ''}
                       </Typography>
                     </Box>
 
-                    {/* Estado de pago a la derecha */}
-                    {!isShared ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {isMarkingMode ? (
-                          isPaid ? (
-                            <Chip
-                              label="DESMARCAR"
-                              size="small"
-                              icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
-                              sx={{
-                                bgcolor: 'success.main',
-                                color: '#FFFFFF',
-                                fontWeight: 800,
-                                fontSize: '0.68rem',
-                                height: 28,
-                                borderRadius: 1.5,
-                                '& .MuiChip-icon': { color: '#FFFFFF' }
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              label="MARCAR"
-                              size="small"
-                              icon={<EditIcon sx={{ fontSize: '13px !important' }} />}
-                              sx={{
-                                bgcolor: 'surface.muted',
-                                color: 'text.primary',
-                                fontWeight: 800,
-                                fontSize: '0.68rem',
-                                height: 28,
-                                borderRadius: 1.5
-                              }}
-                            />
-                          )
-                        ) : (
+                    {/* Botón de Estado */}
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      {isMarkingMode ? (
+                        isPaid ? (
                           <Chip
-                            label={isPaid ? "PAGADO" : "PENDIENTE"}
+                            label="DESMARCAR"
                             size="small"
-                            icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
+                            icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
                             sx={{
-                              bgcolor: isPaid ? 'surface.paid' : 'surface.pending',
-                              color: isPaid ? 'success.main' : 'warning.main',
+                              bgcolor: 'success.main',
+                              color: '#FFFFFF',
                               fontWeight: 800,
                               fontSize: '0.68rem',
-                              height: 24,
+                              height: 28,
                               borderRadius: 1.5,
-                              border: 1,
-                              borderColor: isPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
+                              '& .MuiChip-icon': { color: '#FFFFFF' }
                             }}
                           />
-                        )}
-                      </Box>
-                    ) : (
-                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        ) : (
+                          <Chip
+                            label="MARCAR"
+                            size="small"
+                            icon={<EditIcon sx={{ fontSize: '13px !important' }} />}
+                            sx={{
+                              bgcolor: 'surface.muted',
+                              color: 'text.primary',
+                              fontWeight: 800,
+                              fontSize: '0.68rem',
+                              height: 28,
+                              borderRadius: 1.5
+                            }}
+                          />
+                        )
+                      ) : (
                         <Chip
-                          label={isPaid ? "PAGADO" : "COMPARTIDO"}
+                          label={isPaid ? "PAGADO" : "PENDIENTE"}
                           size="small"
                           icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
                           sx={{
@@ -816,74 +794,136 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                             fontWeight: 800,
                             fontSize: '0.68rem',
                             height: 24,
-                            borderRadius: 1.5
+                            borderRadius: 1.5,
+                            border: 1,
+                            borderColor: isPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
                           }}
                         />
-                        <IconButton size="small" sx={{ p: 0.25, color: 'text.secondary' }}>
-                          <ExpandMoreIcon sx={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s', fontSize: 18 }} />
-                        </IconButton>
-                      </Stack>
-                    )}
+                      )}
+                    </Box>
                   </Box>
+                );
+              }
 
-                  {/* Sub-filas para miembros compartidos */}
-                  {isShared && (
-                    <Collapse in={isExpanded || isMarkingMode}>
-                      <Box sx={{ bgcolor: 'surface.muted', py: 1, px: 2, borderBottom: hasDivider ? 1 : 0, borderColor: 'divider' }}>
-                        <Stack spacing={0.75}>
-                          {p.members.map((m, mIdx) => {
-                            const isMemberPaid = isSharedMemberPaid(p, mIdx, settings.currentTurn);
-                            return (
-                              <Paper
-                                key={mIdx}
-                                elevation={0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onIntentToggle(p, mIdx);
-                                }}
-                                sx={{
-                                  p: 1.25,
-                                  px: 1.75,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  borderRadius: 1.5,
-                                  bgcolor: isMemberPaid ? 'surface.paid' : 'background.paper',
-                                  border: 1,
-                                  borderColor: isMemberPaid ? 'success.main' : 'divider',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
-                                    {m.name}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                    Cuota: {formatCurrency(Math.floor(settings.quotaAmount / p.members.length))}
-                                  </Typography>
-                                </Box>
+              // RENDERIZADO PARTICIPANTE COMPARTIDO (AMBOS MIEMBROS VISIBLES DIRECTAMENTE)
+              const halfQuota = Math.floor(settings.quotaAmount / (p.members.length || 2));
+              const allPaid = p.members.every((_, mIdx) => isSharedMemberPaid(p, mIdx, settings.currentTurn));
 
-                                <Chip
-                                  label={isMemberPaid ? "PAGADO" : "PENDIENTE"}
-                                  size="small"
-                                  icon={<DotIcon sx={{ fontSize: '10px !important', color: isMemberPaid ? 'success.main' : 'warning.main' }} />}
-                                  sx={{
-                                    bgcolor: isMemberPaid ? 'surface.paid' : 'surface.pending',
-                                    color: isMemberPaid ? 'success.main' : 'warning.main',
-                                    fontWeight: 800,
-                                    fontSize: '0.65rem',
-                                    height: 22,
-                                    borderRadius: 1.5
+              return (
+                <Box
+                  key={p.id}
+                  sx={{
+                    p: 1.75,
+                    bgcolor: allPaid ? 'surface.paid' : 'transparent',
+                    borderBottom: hasDivider ? 1 : 0,
+                    borderColor: 'divider',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                    {/* Avatar de Turno Compartido */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 0.25 }}>
+                      <Avatar 
+                        sx={{ 
+                          width: 34, 
+                          height: 34, 
+                          bgcolor: isRecipient 
+                            ? 'secondary.main' 
+                            : allPaid 
+                              ? 'success.main' 
+                              : 'surface.muted',
+                          color: isRecipient || allPaid ? '#FFFFFF' : 'text.primary',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          borderRadius: 1.5
+                        }}
+                      >
+                        {p.turnNumber}
+                      </Avatar>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          fontSize: '0.58rem', 
+                          fontWeight: 800, 
+                          color: 'text.secondary', 
+                          mt: 0.5,
+                          letterSpacing: '0.02em',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        Pareja
+                      </Typography>
+                    </Box>
+
+                    {/* Contenedor Directo de Ambos Miembros (Sin necesidad de desplegar) */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack spacing={1}>
+                        {p.members.map((m, mIdx) => {
+                          const isMemberPaid = isSharedMemberPaid(p, mIdx, settings.currentTurn);
+                          return (
+                            <Paper
+                              key={mIdx}
+                              elevation={0}
+                              onClick={() => onIntentToggle(p, mIdx)}
+                              sx={{
+                                p: 1,
+                                px: 1.5,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                borderRadius: 1.5,
+                                bgcolor: isMemberPaid ? 'surface.paid' : 'surface.muted',
+                                border: 1,
+                                borderColor: isMemberPaid ? 'success.main' : 'divider',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                '&:hover': {
+                                  borderColor: 'secondary.main',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                                }
+                              }}
+                            >
+                              <Box sx={{ minWidth: 0, pr: 1 }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    fontWeight: 700, 
+                                    color: 'text.primary', 
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
                                   }}
-                                />
-                              </Paper>
-                            );
-                          })}
-                        </Stack>
-                      </Box>
-                    </Collapse>
-                  )}
+                                >
+                                  {m.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem' }}>
+                                  Cuota 1/2: {formatCurrency(halfQuota)}
+                                </Typography>
+                              </Box>
+
+                              {/* Chip/Botón de pago individual del miembro */}
+                              <Chip
+                                label={isMemberPaid ? "PAGADO" : "PENDIENTE"}
+                                size="small"
+                                icon={<DotIcon sx={{ fontSize: '10px !important', color: isMemberPaid ? 'success.main' : 'warning.main' }} />}
+                                sx={{
+                                  bgcolor: isMemberPaid ? 'surface.paid' : 'surface.pending',
+                                  color: isMemberPaid ? 'success.main' : 'warning.main',
+                                  fontWeight: 800,
+                                  fontSize: '0.65rem',
+                                  height: 24,
+                                  borderRadius: 1.5,
+                                  border: 1,
+                                  borderColor: isMemberPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
+                                }}
+                              />
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  </Stack>
                 </Box>
               );
             })
@@ -897,7 +937,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
         onClose={() => setConfirmPayment({ open: false, p: null })} 
         PaperProps={{ 
           sx: { 
-            borderRadius: 2.5, 
+            borderRadius: 2, 
             width: '100%', 
             maxWidth: 360,
             p: 1,
@@ -921,14 +961,14 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               : formatCurrency(settings.quotaAmount)}
           </Typography>
 
-          <Box sx={{ bgcolor: 'surface.pending', color: 'warning.main', p: 1.25, borderRadius: 2, display: 'inline-block' }}>
+          <Box sx={{ bgcolor: 'surface.pending', color: 'warning.main', p: 1.25, borderRadius: 1.5, display: 'inline-block' }}>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              ¿Deseas cambiar el estado del turno #{settings.currentTurn}?
+              ¿Deseas cambiar el estado de pago del turno #{settings.currentTurn}?
             </Typography>
           </Box>
           
           {relatedPayments.length > 0 && (
-            <Box sx={{ mt: 2, textAlign: 'left', bgcolor: 'surface.muted', p: 1.25, borderRadius: 2, border: 1, borderColor: 'divider' }}>
+            <Box sx={{ mt: 2, textAlign: 'left', bgcolor: 'surface.muted', p: 1.25, borderRadius: 1.5, border: 1, borderColor: 'divider' }}>
               <FormControlLabel 
                 sx={{ mr: 0 }}
                 control={
@@ -954,7 +994,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             variant="outlined" 
             onClick={() => setConfirmPayment({ open: false, p: null })} 
             sx={{ 
-              borderRadius: 2, 
+              borderRadius: 1.5, 
               fontWeight: 700, 
               minHeight: 44, 
               borderColor: 'divider', 
@@ -995,7 +1035,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             }} 
             sx={{ 
               minHeight: 44, 
-              borderRadius: 2, 
+              borderRadius: 1.5, 
               fontWeight: 700,
               bgcolor: 'secondary.main',
               color: '#FFFFFF'
@@ -1020,7 +1060,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           variant="filled" 
           sx={{ 
             width: '100%', 
-            borderRadius: 2, 
+            borderRadius: 1.5, 
             bgcolor: 'primary.main', 
             color: 'primary.contrastText',
             fontWeight: 700,
