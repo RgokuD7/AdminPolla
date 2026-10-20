@@ -40,6 +40,7 @@ import { AppSettings, Frequency } from "@/types";
 import { calculateCurrentTurnFromDate, formatDateFull } from "@/utils/helpers";
 import { auth } from "../firebase";
 import { useThemeMode, ThemePreference } from "@/theme/ThemeContext";
+import { AppFooter } from "./AppFooter";
 
 const SUPER_ADMIN_ID = import.meta.env.VITE_SUPER_ADMIN_ID;
 
@@ -489,6 +490,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
         >
           {hasChanges ? "Guardar Ajustes" : "Sin Cambios Pendientes"}
         </Button>
+
+        <AppFooter sx={{ py: 2 }} />
       </Stack>
     </Container>
   );

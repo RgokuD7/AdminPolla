@@ -39,6 +39,7 @@ import {
 import { AppSettings, Frequency, PollaGroup } from "@/types";
 import { formatCurrency, getCollectedAmount, getParticipantName, calculateCurrentTurnFromDate } from "@/utils/helpers";
 import { useThemeMode } from "@/theme/ThemeContext";
+import { AppFooter } from "./AppFooter";
 
 interface ListViewProps {
   groups: PollaGroup[];
@@ -336,6 +337,9 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
           })
         )}
       </Stack>
+
+      {/* Footer informativo */}
+      <AppFooter sx={{ mt: 2, mb: 4 }} />
 
       {/* ─── Botón Flotante para Crear Polla ─── */}
       <Fab 

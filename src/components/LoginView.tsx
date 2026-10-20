@@ -8,6 +8,8 @@ import {
   Stack 
 } from '@mui/material';
 
+import { AppFooter } from './AppFooter';
+
 interface LoginViewProps {
   onLogin: () => void;
 }
@@ -135,9 +137,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           </Stack>
         </Paper>
 
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-          AdminPolla • Hecho para el día a día
-        </Typography>
+        <AppFooter sx={{ py: 1 }} />
 
       </Stack>
     </Container>

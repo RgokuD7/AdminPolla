@@ -22,6 +22,7 @@ import {
   SettingsBrightness as AutoModeIcon
 } from '@mui/icons-material';
 import { useThemeMode } from '@/theme/ThemeContext';
+import { AppFooter } from './AppFooter';
 
 const PublicTurnsView = () => {
   const { id } = useParams<{ id: string }>();
@@ -317,11 +318,7 @@ const PublicTurnsView = () => {
           })}
         </Paper>
         
-        <Box sx={{ textAlign: 'center', mt: 3, mb: 3 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-            AdminPolla • Vista Pública
-          </Typography>
-        </Box>
+        <AppFooter sx={{ mt: 3, mb: 2 }} />
 
       </Container>
     </Box>
