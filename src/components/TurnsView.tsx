@@ -552,7 +552,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                       }}
                     />
                     <TextField 
-                      placeholder="Datos bancarios Persona 1..." 
+                      placeholder={isShared ? "Pega aquí datos del banco (Persona 1)..." : "Pega aquí datos del banco (Banco, Cuenta, RUT, etc.)..."} 
                       fullWidth 
                       multiline
                       minRows={2}
@@ -562,6 +562,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                       InputProps={{
                         startAdornment: <InputAdornment position="start" sx={{ mt: 0.5 }}><BankIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment>,
                       }}
+                      inputProps={{ style: { fontSize: '16px' } }}
                     />
                     
                     {isShared && (
@@ -576,9 +577,10 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                           InputProps={{
                             startAdornment: <InputAdornment position="start"><WhatsAppIcon sx={{ fontSize: 16, color: 'secondary.main' }} /></InputAdornment>,
                           }}
+                          inputProps={{ style: { fontSize: '16px' } }}
                         />
                         <TextField 
-                          placeholder="Datos bancarios Persona 2..." 
+                          placeholder="Pega aquí datos del banco (Persona 2)..." 
                           fullWidth 
                           multiline
                           minRows={2}
@@ -588,6 +590,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                           InputProps={{
                             startAdornment: <InputAdornment position="start" sx={{ mt: 0.5 }}><BankIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment>,
                           }}
+                          inputProps={{ style: { fontSize: '16px' } }}
                         />
                       </>
                     )}
@@ -982,10 +985,11 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   }} 
                 />
                 <TextField 
-                  placeholder="Datos bancarios..." 
+                  label="Datos de transferencia"
+                  placeholder={`Pega directo lo que entrega el banco. Ej:\nBanco Estado\nCuenta RUT: 12345678\nRUT: 12.345.678-9\nNombre: Juan Pérez\ncorreo@ejemplo.com`} 
                   fullWidth 
                   multiline
-                  minRows={2}
+                  minRows={3}
                   size="small"
                   value={m.bankDetails || ""} 
                   onChange={(e) => updateEditMember(i, 'bankDetails', e.target.value)} 
@@ -993,6 +997,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                     startAdornment: <InputAdornment position="start" sx={{ mt: 0.5 }}><BankIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment>,
                   }}
                   inputProps={{ style: { fontSize: '16px' } }}
+                  helperText="Copia los datos desde la app de tu banco y pégalos aquí."
                 />
 
                 {/* Sección de Cuenta de Usuario vinculada */}

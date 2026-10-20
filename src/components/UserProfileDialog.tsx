@@ -9,51 +9,27 @@ import {
   Stack,
   Typography,
   Box,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  IconButton,
+  Paper,
+  Tooltip
 } from "@mui/material";
 import {
   AccountBalance as BankIcon,
-  CheckCircle as CheckCircleIcon
+  ContentPaste as PasteIcon,
+  CheckCircle as CheckCircleIcon,
+  InfoOutlined as InfoIcon
 } from "@mui/icons-material";
 import { User } from "@/firebase";
 import { UserService } from "@/services/firestore";
-import { UserProfile } from "@/types";
 
 interface UserProfileDialogProps {
   open: boolean;
   onClose: () => void;
   user: User | null;
 }
-
-const CHILEAN_BANKS = [
-  "BancoEstado / CuentaRUT",
-  "Banco de Chile / Edwards",
-  "Banco Santander",
-  "BCI (Banco de Crédito e Inversiones)",
-  "Scotiabank",
-  "Banco Falabella",
-  "Banco Itaú",
-  "Banco BICE",
-  "Banco Security",
-  "Banco Consorcio",
-  "Tenpo",
-  "Mach (BCI)",
-  "Mercado Pago",
-  "Coopeuch",
-  "Otro"
-];
-
-const ACCOUNT_TYPES = [
-  "Cuenta RUT / Vista",
-  "Cuenta Corriente",
-  "Cuenta de Ahorro"
-];
 
 export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   open,
@@ -64,11 +40,8 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [bank, setBank] = useState("");
-  const [customBank, setCustomBank] = useState("");
-  const [accountType, setAccountType] = useState("Cuenta RUT / Vista");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [rut, setRut] = useState("");
+  const [bankDetails, setBankDetails] = useState("");
+  const [pasteSuccess, setPasteSuccess] = useState(false);
   const [snackbar, setSnackbar] = useState(false);
 
   useEffect(() => {
@@ -80,26 +53,12 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
         if (profile) {
           setName(profile.displayName || user.displayName || "");
           setPhone(profile.phone || "");
-          
-          // Parsear datos bancarios existentes si tienen formato estructurado
           if (profile.bankDetails) {
-            const raw = profile.bankDetails;
-            const parts = raw.split(" • ");
-            if (parts.length >= 3) {
-              const bankFound = CHILEAN_BANKS.find(b => parts[0].includes(b));
-              if (bankFound) {
-                setBank(bankFound);
-              } else {
-                setBank("Otro");
-                setCustomBank(parts[0]);
-              }
-              const typeFound = ACCOUNT_TYPES.find(t => parts[1].includes(t));
-              if (typeFound) setAccountType(typeFound);
-              setAccountNumber(parts[2]?.replace("N° ", "") || "");
-              if (parts[3]) setRut(parts[3]?.replace("RUT: ", "") || "");
-            } else {
-              setAccountNumber(raw);
-            }
+            // Si venía separado por bullet " • ", lo convertimos a saltos de línea para fácil lectura y edición
+            const formatted = profile.bankDetails.includes(" • ")
+              ? profile.bankDetails.split(" • ").join("\n")
+              : profile.bankDetails;
+            setBankDetails(formatted);
           }
         } else {
           setName(user.displayName || "");
@@ -109,26 +68,30 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
       .finally(() => setLoading(false));
   }, [open, user]);
 
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        setBankDetails(text.trim());
+        setPasteSuccess(true);
+        setTimeout(() => setPasteSuccess(false), 2000);
+      }
+    } catch {
+      // Si el navegador bloquea la lectura del portapapeles, el usuario puede pegar directamente en el campo
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
 
-    const selectedBankName = bank === "Otro" ? customBank : bank;
-    const formattedBankDetails = [
-      selectedBankName,
-      accountType,
-      accountNumber ? `N° ${accountNumber}` : "",
-      rut ? `RUT: ${rut}` : "",
-      name ? `Titular: ${name}` : ""
-    ].filter(Boolean).join(" • ");
-
     try {
       await UserService.saveUserProfile({
         uid: user.uid,
-        displayName: name || user.displayName || "Usuario",
+        displayName: name.trim() || user.displayName || "Usuario",
         email: user.email || "",
         phone: phone.trim(),
-        bankDetails: formattedBankDetails
+        bankDetails: bankDetails.trim()
       });
       setSnackbar(true);
       setTimeout(() => {
@@ -161,8 +124,8 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
           Mis Datos de Transferencia
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, fontSize: "0.85rem" }}>
-            Configura tus datos para que cuando te toque recibir dinero en una polla, tus compañeros puedan copiar tu cuenta en 1 toque.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: "0.85rem", lineHeight: 1.4 }}>
+            Configura tus datos para que cuando te toque tu turno, tus compañeros puedan copiar tu cuenta bancaria en 1 toque.
           </Typography>
 
           {loading ? (
@@ -170,76 +133,78 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
               <CircularProgress size={32} color="secondary" />
             </Box>
           ) : (
-            <Stack spacing={2}>
+            <Stack spacing={2.5}>
+              {/* Tip directo al usuario */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  bgcolor: "surface.muted",
+                  borderRadius: 2,
+                  border: 1,
+                  borderColor: "divider",
+                  display: "flex",
+                  gap: 1.25,
+                  alignItems: "flex-start"
+                }}
+              >
+                <InfoIcon sx={{ fontSize: 18, color: "secondary.main", mt: 0.2 }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.4 }}>
+                  Abre la app de tu banco, pulsa en <b>"Compartir datos"</b> o <b>"Copiar cuenta"</b> y pégalo directamente aquí abajo tal como te lo entrega.
+                </Typography>
+              </Paper>
+
+              {/* Campo de texto simple para pegar los datos */}
+              <Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "text.primary", fontSize: "0.8rem" }}>
+                    Datos de la cuenta bancaria:
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handlePasteFromClipboard}
+                    startIcon={pasteSuccess ? <CheckCircleIcon color="success" sx={{ fontSize: "14px !important" }} /> : <PasteIcon sx={{ fontSize: "14px !important" }} />}
+                    sx={{
+                      minHeight: 34,
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      borderRadius: 1.5,
+                      borderColor: "divider",
+                      color: pasteSuccess ? "success.main" : "text.secondary",
+                      py: 0.25,
+                      px: 1
+                    }}
+                  >
+                    {pasteSuccess ? "¡Pegado!" : "Pegar portapapeles"}
+                  </Button>
+                </Box>
+
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  maxRows={7}
+                  placeholder={`Ejemplo:\nBanco Estado\nCuenta RUT: 12.345.678-9\nNombre: Juan Pérez\nRUT: 12.345.678-9\ncorreo@ejemplo.com`}
+                  value={bankDetails}
+                  onChange={(e) => setBankDetails(e.target.value)}
+                  inputProps={{ style: { fontSize: "16px", lineHeight: 1.4 } }}
+                  sx={{
+                    bgcolor: "background.paper",
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2
+                    }
+                  }}
+                />
+              </Box>
+
+              {/* Datos complementarios opcionales */}
               <TextField
-                label="Nombre completo del titular"
+                label="Nombre del titular / Alias"
                 fullWidth
                 size="small"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                inputProps={{ style: { fontSize: "16px" } }}
-              />
-
-              <TextField
-                label="RUT del titular"
-                fullWidth
-                size="small"
-                placeholder="Ej: 12.345.678-9"
-                value={rut}
-                onChange={(e) => setRut(e.target.value)}
-                inputProps={{ style: { fontSize: "16px" } }}
-              />
-
-              <FormControl fullWidth size="small">
-                <InputLabel>Banco o Institución</InputLabel>
-                <Select
-                  label="Banco o Institución"
-                  value={bank}
-                  onChange={(e) => setBank(e.target.value)}
-                  sx={{ fontSize: "16px" }}
-                >
-                  {CHILEAN_BANKS.map((b) => (
-                    <MenuItem key={b} value={b}>
-                      {b}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {bank === "Otro" && (
-                <TextField
-                  label="Nombre de tu banco"
-                  fullWidth
-                  size="small"
-                  value={customBank}
-                  onChange={(e) => setCustomBank(e.target.value)}
-                  inputProps={{ style: { fontSize: "16px" } }}
-                />
-              )}
-
-              <FormControl fullWidth size="small">
-                <InputLabel>Tipo de Cuenta</InputLabel>
-                <Select
-                  label="Tipo de Cuenta"
-                  value={accountType}
-                  onChange={(e) => setAccountType(e.target.value)}
-                  sx={{ fontSize: "16px" }}
-                >
-                  {ACCOUNT_TYPES.map((t) => (
-                    <MenuItem key={t} value={t}>
-                      {t}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <TextField
-                label="Número de Cuenta"
-                fullWidth
-                size="small"
-                placeholder="Ej: 12345678"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
                 inputProps={{ style: { fontSize: "16px" } }}
               />
 
@@ -257,7 +222,7 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
         </DialogContent>
 
         <DialogActions sx={{ p: 2, pt: 0.5 }}>
-          <Button onClick={onClose} color="inherit" sx={{ fontWeight: 700, minHeight: 44 }}>
+          <Button onClick={onClose} color="inherit" sx={{ fontWeight: 700, minHeight: 48, px: 2 }}>
             Cancelar
           </Button>
           <Button
@@ -267,7 +232,7 @@ export const UserProfileDialog: React.FC<UserProfileDialogProps> = ({
             disabled={saving || loading}
             sx={{
               fontWeight: 800,
-              minHeight: 44,
+              minHeight: 48,
               px: 3,
               borderRadius: 2
             }}

@@ -162,24 +162,47 @@ export const UploadReceiptDialog: React.FC<UploadReceiptDialogProps> = ({
 
             {recipientBankDetails ? (
               <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem", display: "block", mb: 0.75 }}>
-                  {recipientBankDetails}
-                </Typography>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.25,
+                    mb: 1,
+                    bgcolor: "background.paper",
+                    borderRadius: 1.5,
+                    border: 1,
+                    borderColor: "divider"
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.primary",
+                      fontSize: "0.78rem",
+                      display: "block",
+                      whiteSpace: "pre-line",
+                      lineHeight: 1.45,
+                      fontFamily: "monospace, sans-serif"
+                    }}
+                  >
+                    {recipientBankDetails}
+                  </Typography>
+                </Paper>
                 <Button
                   size="small"
                   variant="outlined"
+                  fullWidth
                   onClick={handleCopyBank}
-                  startIcon={copiedBank ? <CheckCircleIcon color="success" sx={{ fontSize: "14px !important" }} /> : <ContentCopyIcon sx={{ fontSize: "13px !important" }} />}
+                  startIcon={copiedBank ? <CheckCircleIcon color="success" sx={{ fontSize: "15px !important" }} /> : <ContentCopyIcon sx={{ fontSize: "14px !important" }} />}
                   sx={{
-                    minHeight: 36,
-                    fontSize: "0.72rem",
+                    minHeight: 44,
+                    fontSize: "0.78rem",
                     fontWeight: 700,
                     borderRadius: 1.5,
                     borderColor: "divider",
                     bgcolor: "background.paper"
                   }}
                 >
-                  {copiedBank ? "¡Datos copiados!" : "Copiar datos bancarios"}
+                  {copiedBank ? "¡Datos copiados al portapapeles!" : "Copiar datos bancarios"}
                 </Button>
               </Box>
             ) : (
