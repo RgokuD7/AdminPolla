@@ -8,25 +8,27 @@ import {
   Box, 
   Container, 
   Typography, 
-  Card, 
-  List, 
-  ListItem, 
-  ListItemAvatar, 
-  ListItemText, 
   CircularProgress,
   Chip,
   Paper,
-  Stack
+  Stack,
+  IconButton
 } from '@mui/material';
 import { 
-  Groups as GroupIcon
+  Groups as GroupIcon,
+  Event as EventIcon,
+  AttachMoney as MoneyIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon
 } from '@mui/icons-material';
+import { useThemeMode } from '@/theme/ThemeContext';
 
 const PublicTurnsView = () => {
   const { id } = useParams<{ id: string }>();
   const [group, setGroup] = useState<PollaGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { isDark, toggleMode } = useThemeMode();
 
   useEffect(() => {
     const fetchGroup = async () => {
@@ -36,20 +38,18 @@ const PublicTurnsView = () => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          // Asumimos que los datos coinciden con la interfaz PollaGroup
           const data = docSnap.data();
-          // Aseguramos que participants sea un array
           const rawParticipants = data.participants || [];
           const groupData: PollaGroup = {
-              id: docSnap.id,
-              createdAt: data.createdAt || Date.now(),
-              adminId: data.userId || data.adminId, // Mapeamos userId a adminId si existe
-              settings: data.settings,
-              participants: rawParticipants
+            id: docSnap.id,
+            createdAt: data.createdAt || Date.now(),
+            adminId: data.userId || data.adminId,
+            settings: data.settings,
+            participants: rawParticipants
           };
           setGroup(groupData);
         } else {
-          setError("No encontramos este grupo. Verifica el enlace.");
+          setError("No encontramos este grupo. Verifica el enlace compartido.");
         }
       } catch (err) {
         console.error(err);
@@ -64,146 +64,255 @@ const PublicTurnsView = () => {
 
   if (loading) {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2 }}>
-        <CircularProgress size={40} />
-        <Typography variant="body2" color="text.secondary">Cargando turnos...</Typography>
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, bgcolor: 'background.default' }}>
+        <CircularProgress size={42} color="secondary" />
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Cargando calendario de la polla...</Typography>
       </Box>
     );
   }
 
   if (error || !group) {
     return (
-      <Container maxWidth="xs" sx={{ mt: 10, textAlign: 'center' }}>
-        <Typography variant="h4" sx={{ mb: 2 }}>😕</Typography>
-        <Typography variant="h6" gutterBottom>Algo salió mal</Typography>
-        <Typography color="text.secondary">{error}</Typography>
+      <Container maxWidth="xs" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <Paper sx={{ p: 4, borderRadius: 4, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <Typography variant="h3" sx={{ mb: 1 }}>😕</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800 }} gutterBottom>Enlace no disponible</Typography>
+          <Typography color="text.secondary" variant="body2">{error}</Typography>
+        </Paper>
       </Container>
     );
   }
 
   const { settings, participants } = group;
-  // Ordenar participantes por turno
   const sortedParticipants = [...participants].sort((a, b) => a.turnNumber - b.turnNumber);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#F3F4F6', pb: 4 }}>
-      {/* Header Corporativo Público */}
-      <Box sx={{ bgcolor: 'white', py: 2, px: 3, borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-         <Box component="img" src="/logo.png" sx={{ width: 32, height: 32 }} />
-         <Typography variant="h6" sx={{ fontWeight: 800, color: '#1F2937', fontSize: '1.1rem' }}>
-            <Box component="span" sx={{ color: '#234574' }}>Admin</Box><Box component="span" sx={{ color: '#059669' }}>Polla</Box>
-         </Typography>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 8 }}>
+      {/* ─── Header Público ─── */}
+      <Box sx={{ 
+        bgcolor: 'background.paper', 
+        py: 2, 
+        px: 3, 
+        borderBottom: 1, 
+        borderColor: 'divider', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between'
+      }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box component="img" src="/logo.png" sx={{ width: 34, height: 34 }} />
+          <Typography variant="h6" sx={{ fontWeight: 900, fontSize: '1.1rem', letterSpacing: '-0.5px' }}>
+            <Box component="span" sx={{ color: 'accent.main' }}>Admin</Box>
+            <Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
+          </Typography>
+        </Stack>
+        <IconButton 
+          size="small" 
+          onClick={toggleMode}
+          sx={{ 
+            color: isDark ? '#FBBF24' : 'text.secondary',
+            bgcolor: 'surface.muted',
+            border: 1,
+            borderColor: 'divider',
+            width: 38,
+            height: 38,
+            borderRadius: 2
+          }}
+        >
+          {isDark ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
+        </IconButton>
       </Box>
 
-      <Container maxWidth="sm" sx={{ mt: 3 }}>
+      <Container maxWidth="sm" sx={{ mt: 3, px: 2 }}>
         
-        {/* Tarjeta del Grupo Intro */}
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: '1px solid #E5E7EB' }}>
-          <Stack spacing={1} alignItems="center">
-             <GroupIcon sx={{ fontSize: 40, color: '#3B82F6', bgcolor: '#EFF6FF', p: 1, borderRadius: '50%' }} />
-             <Typography variant="h5" sx={{ fontWeight: 800, textAlign: 'center' }}>{settings.groupName}</Typography>
-             <Chip 
-               label={`${participants.length} Participantes`} 
-               size="small" 
-               sx={{ bgcolor: '#F3F4F6', fontWeight: 600 }} 
-             />
-             <Chip 
-               label={`Monto a Repartir: ${formatCurrency(settings.quotaAmount * participants.length)}`} 
-               color="success"
-               sx={{ fontWeight: 800, mt: 0.5 }} 
-             />
-             <Typography variant="caption" color="text.secondary" sx={{ pt: 1 }}>
+        {/* ─── Hero Card del Grupo ─── */}
+        <Paper 
+          sx={{ 
+            p: 3, 
+            borderRadius: 4, 
+            mb: 3, 
+            border: 1, 
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+          }}
+        >
+          <Stack spacing={2} alignItems="center" textAlign="center">
+            <GroupIcon sx={{ fontSize: 44, color: 'secondary.main', bgcolor: 'surface.paid', p: 1, borderRadius: '50%' }} />
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: 'text.primary' }}>
+                {settings.groupName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mt: 0.5, display: 'block' }}>
                 Frecuencia: {settings.frequency === 'biweekly' ? 'Quincenal' : 'Mensual'}
-             </Typography>
+              </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
+              <Chip 
+                label={`${participants.length} Participantes`} 
+                size="small" 
+                sx={{ bgcolor: 'surface.muted', fontWeight: 700 }} 
+              />
+              <Chip 
+                icon={<MoneyIcon sx={{ fontSize: '14px !important' }} />}
+                label={`Meta: ${formatCurrency(settings.quotaAmount * participants.length)}`} 
+                size="small"
+                sx={{ bgcolor: 'surface.paid', color: 'secondary.main', fontWeight: 800, '& .MuiChip-icon': { color: 'secondary.main' } }} 
+              />
+              <Chip 
+                label={`Cuota: ${formatCurrency(settings.quotaAmount)} c/u`} 
+                size="small" 
+                variant="outlined"
+                sx={{ fontWeight: 700, borderColor: 'divider' }} 
+              />
+            </Stack>
           </Stack>
         </Paper>
 
-        <Typography variant="h6" sx={{ mb: 2, px: 1, fontWeight: 700 }}>
-           Calendario de Turnos
+        {/* ─── Calendario de Turnos ─── */}
+        <Typography variant="h6" sx={{ mb: 2, px: 0.5, fontWeight: 800 }}>
+          Calendario de Beneficiarios
         </Typography>
 
-        <List sx={{ p: 0 }}>
-          {sortedParticipants.map((p) => {
+        <Paper 
+          sx={{ 
+            borderRadius: 4, 
+            overflow: 'hidden', 
+            border: 1, 
+            borderColor: 'divider', 
+            bgcolor: 'background.paper',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
+          }}
+        >
+          {sortedParticipants.map((p, idx) => {
             const paymentDate = calculatePaymentDate(settings, p.turnNumber);
             const isCurrent = p.turnNumber === settings.currentTurn;
             const isPast = p.turnNumber < settings.currentTurn;
+            const hasDivider = idx < sortedParticipants.length - 1;
             
-            // UI Date Format
             const dayNumber = paymentDate.split('-')[2];
-            const monthShort = formatDateReadable(paymentDate).split(' ')[1].toUpperCase();
-            
+            const monthShort = formatDateReadable(paymentDate).split(' ')[1]?.toUpperCase() || "";
+
             return (
-              <Card 
-                key={p.id} 
-                sx={{ 
-                  mb: 1.5, 
-                  border: isCurrent ? '2px solid' : '1px solid',
-                  borderColor: isCurrent ? '#059669' : '#E5E7EB',
-                  borderRadius: 3,
-                  opacity: isPast ? 0.7 : 1,
-                  bgcolor: isCurrent ? '#ECFDF5' : 'white',
-                  // Efecto visual para el actual
-                  transform: isCurrent ? 'scale(1.02)' : 'none',
-                  transition: 'transform 0.2s',
-                  boxShadow: isCurrent ? '0 4px 12px rgba(5, 150, 105, 0.15)' : 'none'
+              <Box 
+                key={p.id}
+                sx={{
+                  p: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  bgcolor: isCurrent ? 'surface.paid' : 'transparent',
+                  opacity: isPast ? 0.6 : 1,
+                  borderBottom: hasDivider ? 1 : 0,
+                  borderColor: 'divider',
+                  borderLeft: isCurrent ? 4 : 0,
+                  borderLeftColor: 'secondary.main',
+                  transition: 'all 0.2s ease'
                 }}
               >
-                  {isCurrent && (
-                    <Chip 
-                      label="TURNO ACTUAL" 
-                      sx={{ 
-                        position: 'absolute', 
-                        top: 8, 
-                        right: 8, 
-                        height: 20, 
-                        fontSize: '0.6rem', 
-                        fontWeight: 800,
-                        bgcolor: '#059669',
-                        color: 'white'
-                      }} 
-                    />
-                  )}
+                {/* Caja de Fecha */}
+                <Box 
+                  sx={{ 
+                    minWidth: 52, 
+                    width: 52,
+                    height: 52,
+                    borderRadius: 3, 
+                    border: 1.5, 
+                    borderColor: isCurrent ? 'secondary.main' : 'divider',
+                    bgcolor: isCurrent ? 'background.paper' : 'surface.muted',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      fontSize: '0.65rem', 
+                      fontWeight: 900, 
+                      lineHeight: 1, 
+                      color: isCurrent ? 'secondary.main' : 'accent.main'
+                    }}
+                  >
+                    {monthShort}
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 900, 
+                      fontSize: '1.2rem', 
+                      lineHeight: 1.1, 
+                      color: isCurrent ? 'secondary.main' : 'text.primary',
+                      mt: 0.2
+                    }}
+                  >
+                    {dayNumber}
+                  </Typography>
+                </Box>
 
-                  <ListItem sx={{ py: 2 }}>
-                    <ListItemAvatar sx={{ minWidth: 60, textAlign: 'center', mr: 1 }}>
-                      <Box sx={{ 
-                        border: '2px solid', 
-                        borderColor: isCurrent ? '#059669' : '#3B82F6', 
-                        borderRadius: 2.5, 
-                        px: 0.5, py: 0.8,
-                        bgcolor: 'white' 
-                      }}>
-                        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', fontWeight: 900, lineHeight: 1, color: isCurrent ? '#059669' : '#3B82F6' }}>
-                          {monthShort}
-                        </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1, color: isCurrent ? '#059669' : '#3B82F6' }}>
-                          {dayNumber}
-                        </Typography>
-                      </Box>
-                    </ListItemAvatar>
-                    
-                    <ListItemText 
-                       primary={
-                         <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1F2937' }}>
-                            {getParticipantName(p)}
-                         </Typography>
-                       }
-                       secondary={
-                         <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
-                           <Typography variant="caption" sx={{ fontWeight: 600, bgcolor: 'rgba(0,0,0,0.05)', px: 1, borderRadius: 1 }}>
-                             Turno #{p.turnNumber}
-                           </Typography>
-                         </Stack>
-                       }
-                    />
-                  </ListItem>
-              </Card>
+                {/* Info del Participante */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Typography 
+                      variant="subtitle1" 
+                      sx={{ 
+                        fontWeight: 800, 
+                        color: 'text.primary',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {getParticipantName(p)}
+                    </Typography>
+                    {isCurrent && (
+                      <Chip 
+                        label="LE TOCA AHORA" 
+                        size="small" 
+                        sx={{ 
+                          height: 20, 
+                          fontSize: '0.65rem', 
+                          fontWeight: 800, 
+                          bgcolor: 'secondary.main', 
+                          color: '#FFFFFF' 
+                        }} 
+                      />
+                    )}
+                  </Stack>
+
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        bgcolor: 'surface.muted', 
+                        color: 'text.secondary', 
+                        px: 1, 
+                        py: 0.2, 
+                        borderRadius: 1 
+                      }}
+                    >
+                      Turno #{p.turnNumber}
+                    </Typography>
+                    {p.type === 'shared' && (
+                      <Chip 
+                        label="Compartido" 
+                        size="small" 
+                        variant="outlined" 
+                        sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600, borderColor: 'divider' }} 
+                      />
+                    )}
+                  </Stack>
+                </Box>
+              </Box>
             );
           })}
-        </List>
+        </Paper>
         
         <Box sx={{ textAlign: 'center', mt: 4, mb: 4 }}>
-             <Typography variant="caption" color="text.disabled">AdminPolla Vista Pública</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+            AdminPolla • Vista Pública Segura
+          </Typography>
         </Box>
 
       </Container>

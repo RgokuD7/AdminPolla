@@ -2,7 +2,6 @@ import React from "react";
 import {
   Typography,
   Container,
-  Card,
   Stack,
   Button,
   TextField,
@@ -16,7 +15,10 @@ import {
   Box,
   IconButton,
   Tooltip,
-  Chip
+  Chip,
+  Paper,
+  Switch,
+  FormControlLabel
 } from "@mui/material";
 import { 
   ArrowBack as ArrowBackIcon,
@@ -29,13 +31,15 @@ import {
   LockOpen as LockOpenIcon,
   Sync as SyncIcon,
   SaveAlt as SaveIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
+  Palette as PaletteIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency } from "@/types";
 import { calculateCurrentTurnFromDate, formatDateFull } from "@/utils/helpers";
 import { auth } from "../firebase";
-
-
+import { useThemeMode } from "@/theme/ThemeContext";
 
 const SUPER_ADMIN_ID = import.meta.env.VITE_SUPER_ADMIN_ID;
 
@@ -46,18 +50,20 @@ interface SettingsViewProps {
 }
 
 const sectionCardSx = {
-  p: 0, 
   borderRadius: 4, 
-  border: '1px solid #E5E7EB', 
-  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  border: 1, 
+  borderColor: 'divider', 
+  bgcolor: 'background.paper',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
   overflow: 'hidden'
 };
 
 const sectionHeaderSx = {
   px: 2.5, 
   py: 1.5, 
-  bgcolor: '#F9FAFB', 
-  borderBottom: '1px solid #F3F4F6',
+  bgcolor: 'surface.muted', 
+  borderBottom: 1, 
+  borderColor: 'divider',
   display: 'flex',
   alignItems: 'center',
   gap: 1
@@ -71,60 +77,68 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
   const [localSettings, setLocalSettings] = React.useState<AppSettings>(settings);
   const [isManualTurnEnabled, setIsManualTurnEnabled] = React.useState(false);
   const [hasChanges, setHasChanges] = React.useState(false);
+  const { mode, toggleMode, isDark } = useThemeMode();
 
-  // Detectar cambios para habilitar botón
   React.useEffect(() => {
-     setHasChanges(JSON.stringify(settings) !== JSON.stringify(localSettings));
+    setHasChanges(JSON.stringify(settings) !== JSON.stringify(localSettings));
   }, [localSettings, settings]);
 
   const handleSave = () => {
-      onUpdate(localSettings);
-      // Pequeño hack para resetear estado de cambios tras update (aunque el padre renderizará de nuevo)
-      setHasChanges(false);
+    onUpdate(localSettings);
+    setHasChanges(false);
   };
 
-  // Formatear la fecha de inicio para mostrarla legible
   const formattedStartDate = localSettings.startDate 
     ? formatDateFull(localSettings.startDate)
     : null;
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4, pb: 16 }}>
-      {/* Header */}
+    <Container maxWidth="sm" sx={{ py: 4, pb: 16, px: 2 }}>
+      {/* ─── Header ─── */}
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-        <IconButtonBack onClick={onGoBack} />
+        <IconButton 
+          onClick={onGoBack} 
+          sx={{ 
+            width: 42, 
+            height: 42, 
+            bgcolor: 'surface.muted', 
+            borderRadius: 2.5,
+            border: 1,
+            borderColor: 'divider',
+            color: 'text.primary',
+            '&:hover': { bgcolor: 'background.paper' }
+          }}
+        >
+          <ArrowBackIcon fontSize="small" />
+        </IconButton>
         <Typography variant="h5" sx={{ fontWeight: 900 }}>Ajustes</Typography>
         <Box sx={{ flexGrow: 1 }} />
         <Button 
-            variant="outlined" 
-            color="inherit"
-            startIcon={<GroupIcon />}
-            onClick={onGoBack}
-            sx={{ 
-                borderRadius: 4, 
-                textTransform: 'none', 
-                fontWeight: 700,
-                borderWidth: 2,
-                borderColor: 'rgba(0,0,0,0.1)',
-                '&:hover': {
-                    borderWidth: 2,
-                    borderColor: 'primary.main',
-                    color: 'primary.main',
-                    bgcolor: 'rgba(37, 99, 235, 0.05)'
-                }
-            }}
+          variant="outlined" 
+          startIcon={<GroupIcon />}
+          onClick={onGoBack}
+          sx={{ 
+            borderRadius: 3, 
+            fontWeight: 700,
+            borderColor: 'divider',
+            color: 'text.primary',
+            height: 40,
+            px: 2,
+            bgcolor: 'background.paper',
+            '&:hover': { borderColor: 'text.secondary' }
+          }}
         >
-            Mis Pollas
+          Mis Grupos
         </Button>
       </Stack>
 
       <Stack spacing={2.5}>
         {/* ─── Sección 1: Información General ─── */}
-        <Card sx={sectionCardSx}>
+        <Paper sx={sectionCardSx} elevation={0}>
           <Box sx={sectionHeaderSx}>
             <GroupIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: 'text.secondary' }}>
-              Información del Grupo
+            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em', color: 'text.secondary' }}>
+              INFORMACIÓN GENERAL
             </Typography>
           </Box>
           <Box sx={sectionBodySx}>
@@ -139,34 +153,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                 }}
               />
               <TextField 
-                label="Monto Cuota" 
+                label="Monto de la Cuota" 
                 type="text" 
                 fullWidth 
                 value={localSettings.quotaAmount === 0 ? '' : new Intl.NumberFormat('es-CL').format(localSettings.quotaAmount)} 
                 disabled={localSettings.currentTurn > 1}
-                helperText={localSettings.currentTurn > 1 ? "⚠️ Polla iniciada. No se puede cambiar el monto." : ""}
+                helperText={localSettings.currentTurn > 1 ? "⚠️ Polla iniciada. No se puede cambiar el monto pactado." : "Monto por cada integrante por turno"}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/\./g, '');
                   if (rawValue === '') {
-                      setLocalSettings({ ...localSettings, quotaAmount: 0 });
+                    setLocalSettings({ ...localSettings, quotaAmount: 0 });
                   } else if (/^\d*$/.test(rawValue)) {
-                      setLocalSettings({ ...localSettings, quotaAmount: Number(rawValue) });
+                    setLocalSettings({ ...localSettings, quotaAmount: Number(rawValue) });
                   }
                 }}
                 InputProps={{
-                  startAdornment: <InputAdornment position="start"><Typography sx={{ color: 'text.secondary', fontWeight: 600 }}>$</Typography></InputAdornment>,
+                  startAdornment: <InputAdornment position="start"><Typography sx={{ color: 'text.secondary', fontWeight: 700 }}>$</Typography></InputAdornment>,
                 }} 
               />
             </Stack>
           </Box>
-        </Card>
+        </Paper>
 
-        {/* ─── Sección 2: Frecuencia ─── */}
-        <Card sx={sectionCardSx}>
+        {/* ─── Sección 2: Frecuencia y Calendario ─── */}
+        <Paper sx={sectionCardSx} elevation={0}>
           <Box sx={sectionHeaderSx}>
             <FrequencyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: 'text.secondary' }}>
-              Frecuencia y Calendario
+            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em', color: 'text.secondary' }}>
+              FRECUENCIA Y FECHAS
             </Typography>
           </Box>
           <Box sx={sectionBodySx}>
@@ -182,44 +196,41 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                   }}
                   startAdornment={<InputAdornment position="start" sx={{ ml: 1, mr: 2 }}><FrequencyIcon sx={{ color: 'text.secondary' }} /></InputAdornment>}
                 >
-                   <MenuItem value="biweekly">Quincenal (15 y Fin de mes)</MenuItem>
-                   <MenuItem value="monthly">Mensual (Fin de mes)</MenuItem>
+                  <MenuItem value="biweekly">Quincenal (Día 15 y Fin de mes)</MenuItem>
+                  <MenuItem value="monthly">Mensual (Fin de mes)</MenuItem>
                 </Select>
               </FormControl>
               
-              {/* ─── Fecha de Inicio (Rediseñada) ─── */}
+              {/* Panel de Fecha de Inicio */}
               <Box sx={{ 
-                bgcolor: '#F9FAFB', 
+                bgcolor: 'surface.muted', 
                 borderRadius: 3, 
-                border: '1px solid #E5E7EB',
+                border: 1, 
+                borderColor: 'divider',
                 overflow: 'hidden'
               }}>
                 <Box sx={{ 
-                  px: 2, py: 1.5, 
+                  px: 2, 
+                  py: 1.5, 
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: 1.5,
-                  borderBottom: '1px solid #F3F4F6'
+                  borderBottom: 1,
+                  borderColor: 'divider'
                 }}>
-                  <CalendarIcon sx={{ fontSize: 20, color: '#059669' }} />
+                  <CalendarIcon sx={{ fontSize: 20, color: 'secondary.main' }} />
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="caption" sx={{ 
                       fontWeight: 700, 
                       fontSize: '0.7rem', 
-                      textTransform: 'uppercase', 
                       letterSpacing: '0.05em',
                       color: 'text.secondary',
-                      display: 'block',
-                      lineHeight: 1.2
+                      display: 'block'
                     }}>
-                      Fecha de Inicio
+                      FECHA DE INICIO DEL 1ER TURNO
                     </Typography>
                     {formattedStartDate && (
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 600, 
-                        color: 'text.primary',
-                        mt: 0.25
-                      }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', mt: 0.25 }}>
                         {formattedStartDate}
                       </Typography>
                     )}
@@ -230,17 +241,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                       label="En curso" 
                       size="small" 
                       sx={{ 
-                        bgcolor: '#FEF3C7', 
-                        color: '#92400E', 
-                        fontWeight: 700, 
+                        bgcolor: 'surface.pending', 
+                        color: 'warning.main', 
+                        fontWeight: 800, 
                         fontSize: '0.65rem',
                         height: 24,
-                        '& .MuiChip-icon': { color: '#92400E' }
+                        '& .MuiChip-icon': { color: 'warning.main' }
                       }} 
                     />
                   )}
                 </Box>
-                <Box sx={{ px: 2, py: 1.5 }}>
+                <Box sx={{ p: 2 }}>
                   <TextField 
                     type="date" 
                     fullWidth 
@@ -249,15 +260,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                     disabled={localSettings.currentTurn > 1}
                     onChange={e => setLocalSettings({...localSettings, startDate: e.target.value})} 
                     InputLabelProps={{ shrink: true }} 
-                    helperText={localSettings.currentTurn > 1 ? "No se puede editar: La polla ya está en marcha." : "Selecciona cuándo inicia el primer turno."}
+                    helperText={localSettings.currentTurn > 1 ? "Bloqueado: La polla ya inició." : "Fecha base para el calendario de pagos."}
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white',
-                      },
-                      '& .MuiFormHelperText-root': {
-                        mx: 0,
-                        mt: 1,
-                        fontSize: '0.7rem'
+                        bgcolor: 'background.paper',
                       }
                     }}
                   />
@@ -265,66 +271,65 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
               </Box>
             </Stack>
           </Box>
-        </Card>
+        </Paper>
 
         {/* ─── Sección 3: Días de Gracia ─── */}
-        <Card sx={sectionCardSx}>
+        <Paper sx={sectionCardSx} elevation={0}>
           <Box sx={sectionHeaderSx}>
-            <TimerIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: 'text.secondary' }}>
-              Días de Gracia
+            <TimerIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em', color: 'text.secondary' }}>
+              DÍAS DE GRACIA (TOLERANCIA)
             </Typography>
             <Box sx={{ flexGrow: 1 }} />
             <Chip 
               label="Tolerancia" 
               size="small"
               sx={{ 
-                bgcolor: '#EFF6FF', 
-                color: '#1D4ED8', 
-                fontWeight: 700, 
-                fontSize: '0.6rem',
-                height: 22,
-                letterSpacing: '0.03em'
+                bgcolor: 'surface.pending', 
+                color: 'warning.main', 
+                fontWeight: 800, 
+                fontSize: '0.65rem',
+                height: 22
               }} 
             />
           </Box>
           <Box sx={sectionBodySx}>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, fontSize: '0.8rem', lineHeight: 1.5 }}>
-              Días extra de tolerancia después de la fecha de vencimiento para considerar el pago como a tiempo.
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, fontSize: '0.85rem' }}>
+              Días adicionales después del vencimiento antes de considerar un pago como atrasado.
             </Typography>
 
             {localSettings.frequency === 'biweekly' ? (
               <Grid container spacing={2}>
-                 <Grid item xs={6}>
-                   <TextField 
-                      label="Día 15" 
-                      helperText="Tras el 15"
-                      type="number" 
-                      fullWidth 
-                      size="small"
-                      value={localSettings.graceDays1 || ''} 
-                      onChange={(e) => setLocalSettings({ ...localSettings, graceDays1: Number(e.target.value) })}
-                      InputProps={{ 
-                        endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.7rem' }}>días</Typography></InputAdornment>,
-                        startAdornment: <InputAdornment position="start"><TimerIcon fontSize="small" sx={{ color: '#D97706' }} /></InputAdornment>
-                      }}
-                    />
-                 </Grid>
-                 <Grid item xs={6}>
-                   <TextField 
-                      label="Fin de Mes" 
-                      helperText="Tras fin de mes"
-                      type="number" 
-                      fullWidth 
-                      size="small"
-                      value={localSettings.graceDays2 || ''} 
-                      onChange={(e) => setLocalSettings({ ...localSettings, graceDays2: Number(e.target.value) })}
-                      InputProps={{ 
-                        endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.7rem' }}>días</Typography></InputAdornment>,
-                        startAdornment: <InputAdornment position="start"><TimerIcon fontSize="small" sx={{ color: '#D97706' }} /></InputAdornment>
-                      }}
-                    />
-                 </Grid>
+                <Grid item xs={6}>
+                  <TextField 
+                    label="Quincena (Día 15)" 
+                    helperText="Días tras el 15"
+                    type="number" 
+                    fullWidth 
+                    size="small"
+                    value={localSettings.graceDays1 || ''} 
+                    onChange={(e) => setLocalSettings({ ...localSettings, graceDays1: Number(e.target.value) })}
+                    InputProps={{ 
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>días</Typography></InputAdornment>,
+                      startAdornment: <InputAdornment position="start"><TimerIcon fontSize="small" sx={{ color: 'warning.main' }} /></InputAdornment>
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField 
+                    label="Fin de Mes" 
+                    helperText="Días tras fin de mes"
+                    type="number" 
+                    fullWidth 
+                    size="small"
+                    value={localSettings.graceDays2 || ''} 
+                    onChange={(e) => setLocalSettings({ ...localSettings, graceDays2: Number(e.target.value) })}
+                    InputProps={{ 
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>días</Typography></InputAdornment>,
+                      startAdornment: <InputAdornment position="start"><TimerIcon fontSize="small" sx={{ color: 'warning.main' }} /></InputAdornment>
+                    }}
+                  />
+                </Grid>
               </Grid>
             ) : (
               <TextField 
@@ -334,39 +339,74 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                 value={localSettings.graceDays1 || ''} 
                 onChange={(e) => setLocalSettings({ ...localSettings, graceDays1: Number(e.target.value) })}
                 InputProps={{
-                  startAdornment: <InputAdornment position="start"><TimerIcon sx={{ color: '#D97706' }} /></InputAdornment>,
-                  endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.7rem' }}>días</Typography></InputAdornment>,
+                  startAdornment: <InputAdornment position="start"><TimerIcon sx={{ color: 'warning.main' }} /></InputAdornment>,
+                  endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>días</Typography></InputAdornment>,
                 }} 
               />
             )}
           </Box>
-        </Card>
+        </Paper>
 
-        {/* ─── Sección 4: Turno Actual (Solo Super Admin) ─── */}
+        {/* ─── Sección 4: Apariencia (Modo Oscuro / Claro) ─── */}
+        <Paper sx={sectionCardSx} elevation={0}>
+          <Box sx={sectionHeaderSx}>
+            <PaletteIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em', color: 'text.secondary' }}>
+              APARIENCIA Y TEMA
+            </Typography>
+          </Box>
+          <Box sx={sectionBodySx}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                  {isDark ? "Modo Oscuro Activo 🌙" : "Modo Claro Activo ☀️"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Ajusta la paleta visual para descansar la vista
+                </Typography>
+              </Box>
+              <IconButton 
+                onClick={toggleMode}
+                sx={{ 
+                  width: 48, 
+                  height: 48, 
+                  bgcolor: 'surface.muted', 
+                  border: 1, 
+                  borderColor: 'divider',
+                  color: isDark ? '#FBBF24' : '#4B5563',
+                  borderRadius: 3
+                }}
+              >
+                {isDark ? <DarkModeIcon /> : <LightModeIcon />}
+              </IconButton>
+            </Stack>
+          </Box>
+        </Paper>
+
+        {/* ─── Sección 5: Control de Turno (Super Admin) ─── */}
         {auth?.currentUser?.uid === SUPER_ADMIN_ID && (
-          <Card sx={{ ...sectionCardSx, border: '1px solid #FDE68A' }}>
-            <Box sx={{ ...sectionHeaderSx, bgcolor: '#FFFBEB', borderBottom: '1px solid #FEF3C7' }}>
-              <NumberIcon sx={{ fontSize: 18, color: '#D97706' }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase', color: '#92400E' }}>
-                Control de Turno
+          <Paper sx={{ ...sectionCardSx, borderColor: 'warning.main' }} elevation={0}>
+            <Box sx={{ ...sectionHeaderSx, bgcolor: 'surface.pending' }}>
+              <NumberIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+              <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em', color: 'warning.main' }}>
+                CONTROL DE TURNO (ADMIN)
               </Typography>
               <Box sx={{ flexGrow: 1 }} />
               <Chip 
-                label="Admin" 
+                label="SuperAdmin" 
                 size="small"
                 sx={{ 
-                  bgcolor: '#FEF3C7', 
-                  color: '#92400E', 
-                  fontWeight: 700, 
-                  fontSize: '0.6rem',
-                  height: 22,
-                  letterSpacing: '0.03em'
+                  bgcolor: 'warning.main', 
+                  color: '#FFFFFF', 
+                  fontWeight: 800, 
+                  fontSize: '0.65rem',
+                  height: 22
                 }} 
               />
             </Box>
             <Box sx={sectionBodySx}>
               <TextField 
-                label="Turno Actual" 
+                label="Turno Actual Forzado" 
                 type="number" 
                 fullWidth 
                 disabled={!isManualTurnEnabled}
@@ -377,12 +417,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                   startAdornment: <InputAdornment position="start"><NumberIcon sx={{ color: isManualTurnEnabled ? 'warning.main' : 'text.disabled' }} /></InputAdornment>,
                   endAdornment: (
                     <InputAdornment position="end">
-                       <Tooltip title="Recalcular según fecha real">
+                      <Tooltip title="Recalcular según fecha real">
                         <IconButton onClick={() => setLocalSettings({ ...localSettings, currentTurn: calculateCurrentTurnFromDate(localSettings) })} edge="end" size="small" sx={{ mr: 0.5 }}>
                           <SyncIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      
                       <Tooltip title={isManualTurnEnabled ? "Bloquear Turno" : "Desbloquear edición manual"}>
                         <IconButton onClick={() => setIsManualTurnEnabled(!isManualTurnEnabled)} edge="end" size="small">
                           {isManualTurnEnabled ? <LockOpenIcon color="warning" /> : <LockIcon fontSize="small" />}
@@ -393,13 +432,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
                 }} 
               />
             </Box>
-          </Card>
+          </Paper>
         )}
 
-        {/* ─── Botón Guardar ─── */}
+        {/* ─── Botón Guardar Cambios ─── */}
         <Button 
           variant="contained" 
-          color="primary"
+          color="secondary"
           fullWidth 
           size="large"
           startIcon={hasChanges ? <SaveIcon /> : undefined}
@@ -407,32 +446,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onGoBac
           disabled={!hasChanges}
           sx={{ 
             borderRadius: 3, 
-            mt: 2, 
             py: 1.5, 
-            fontWeight: 700, 
-            boxShadow: hasChanges ? '0 4px 15px rgba(17, 24, 39, 0.25)' : 'none',
+            minHeight: 52,
+            fontWeight: 800, 
+            bgcolor: hasChanges ? 'secondary.main' : undefined,
+            color: '#FFFFFF',
             fontSize: '1rem',
+            boxShadow: hasChanges ? '0 8px 24px rgba(5, 150, 105, 0.3)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
-          {hasChanges ? "Guardar Cambios" : "Sin Cambios"}
+          {hasChanges ? "Guardar Ajustes" : "Sin Cambios Pendientes"}
         </Button>
       </Stack>
     </Container>
   );
 };
-
-// Pequeño componente local para el botón de atrás
-const IconButtonBack = ({ onClick }: { onClick: () => void }) => (
-  <Button 
-    onClick={onClick}
-    sx={{ 
-      minWidth: 40, width: 40, height: 40, borderRadius: '50%', p: 0, 
-      color: 'text.primary', bgcolor: 'transparent', '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' } 
-    }}
-  >
-    <ArrowBackIcon />
-  </Button>
-);
 
 export default SettingsView;

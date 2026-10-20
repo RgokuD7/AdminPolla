@@ -33,11 +33,11 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     } catch (error: any) {
       console.error("Login Error:", error);
       if (error?.code === 'auth/popup-blocked' || error?.message?.includes('popup')) {
-          setErrorMsg("⚠️ Navegador bloqueó la ventana. Por favor permite los Pop-ups (ventanas emergentes) e intenta de nuevo.");
+        setErrorMsg("⚠️ Tu navegador bloqueó la ventana. Por favor permite las ventanas emergentes (Pop-ups) e intenta nuevamente.");
       } else if (error?.code === 'auth/popup-closed-by-user') {
-          console.log("Usuario canceló el login");
+        console.log("Usuario canceló el login");
       } else {
-          setErrorMsg("Error al iniciar sesión. Revisa tu conexión.");
+        setErrorMsg("Error al iniciar sesión. Revisa tu conexión o intenta más tarde.");
       }
     } finally {
       setLoading(false);
@@ -45,8 +45,8 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   };
 
   return (
-    <Container maxWidth="xs" sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Stack spacing={4} alignItems="center" width="100%">
+    <Container maxWidth="xs" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+      <Stack spacing={3.5} alignItems="center" width="100%">
         
         {/* Brand Section */}
         <Box textAlign="center">
@@ -54,13 +54,20 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             component="img" 
             src="/logo.png" 
             alt="Logo AdminPolla" 
-            sx={{ width: 220, height: 220, mb: 4, objectFit: 'contain' }} 
+            sx={{ 
+              width: 140, 
+              height: 140, 
+              mb: 2.5, 
+              objectFit: 'contain',
+              filter: 'drop-shadow(0px 10px 20px rgba(0,0,0,0.12))'
+            }} 
           />
-          <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', mb: 1 }}>
-            <Box component="span" sx={{ color: '#234574' }}>Admin</Box><Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
+          <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-1px', mb: 0.5, color: 'text.primary' }}>
+            <Box component="span" sx={{ color: 'accent.main' }}>Admin</Box>
+            <Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Gestiona tus grupos de ahorro sin complicaciones.
+          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+            Gestiona tus grupos de ahorro y turnos sin enredos.
           </Typography>
         </Box>
 
@@ -68,25 +75,33 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         <Paper 
           elevation={0}
           sx={{ 
-            p: 4, 
+            p: 3.5, 
             width: '100%', 
             borderRadius: 4, 
-            border: '1px solid',
+            border: 1,
             borderColor: 'divider',
-            bgcolor: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0px 4px 20px rgba(0,0,0,0.05)'
+            bgcolor: 'background.paper',
+            boxShadow: '0px 8px 30px rgba(0,0,0,0.06)'
           }}
         >
-          <Stack spacing={3}>
-            <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>
-              Bienvenido
+          <Stack spacing={2.5}>
+            <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center', color: 'text.primary' }}>
+              Iniciar Sesión
             </Typography>
 
             {errorMsg && (
-                <Box sx={{ bgcolor: '#FEF2F2', color: '#991B1B', p: 2, borderRadius: 2, fontSize: '0.85rem', fontWeight: 500, border: '1px solid #FCA5A5' }}>
-                    {errorMsg}
-                </Box>
+              <Box sx={{ 
+                bgcolor: 'surface.overdue', 
+                color: 'error.main', 
+                p: 2, 
+                borderRadius: 2.5, 
+                fontSize: '0.85rem', 
+                fontWeight: 600, 
+                border: 1, 
+                borderColor: 'error.main' 
+              }}>
+                {errorMsg}
+              </Box>
             )}
             
             <Button
@@ -98,35 +113,30 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
               startIcon={loading ? null : <GoogleIcon />}
               sx={{ 
                 py: 1.5,
+                minHeight: 50,
                 borderRadius: 3,
-                textTransform: 'none',
-                borderColor: '#E5E7EB',
-                color: '#374151',
-                fontWeight: 600,
-                bgcolor: 'white',
-                fontSize: '1rem',
+                borderColor: 'divider',
+                color: 'text.primary',
+                fontWeight: 700,
+                bgcolor: 'surface.muted',
+                fontSize: '0.95rem',
                 '&:hover': {
-                  bgcolor: '#F9FAFB',
-                  borderColor: '#D1D5DB'
+                  bgcolor: 'background.paper',
+                  borderColor: 'text.secondary'
                 }
               }}
             >
               {loading ? "Conectando..." : "Continuar con Google"}
             </Button>
             
-            <Typography variant="caption" color="text.disabled" textAlign="center" sx={{ display: 'block', px: 2, lineHeight: 1.4 }}>
-               Si la ventana no abre, verifica que no tengas bloqueados los <b>Pop-ups</b> en tu navegación.
-            </Typography>
-
-            <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', px: 2 }}>
-              Al continuar, aceptas nuestros Términos de Servicio y Política de Privacidad.
+            <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', px: 1, lineHeight: 1.4 }}>
+              Si la ventana no abre, habilita las ventanas emergentes en tu navegador.
             </Typography>
           </Stack>
         </Paper>
 
-        {/* Footer/Version */}
-        <Typography variant="caption" color="text.disabled">
-          v1.0.0 • AdminPolla
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+          AdminPolla • Hecho para el día a día
         </Typography>
 
       </Stack>
