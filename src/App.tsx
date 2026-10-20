@@ -312,25 +312,24 @@ const App = () => {
         />
       )}
       
-      {/* ─── Bottom Navigation v2 ─── */}
+      {/* ─── Bottom Navigation Sobrio ─── */}
       <Paper sx={{ 
         position: 'fixed', 
         bottom: 0, 
         left: 0, 
         right: 0, 
         zIndex: 1000, 
-        borderRadius: '24px 24px 0 0', 
+        borderRadius: 0, 
         borderTop: 1,
         borderColor: 'divider',
         bgcolor: 'background.paper',
-        pb: "env(safe-area-inset-bottom)",
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)'
+        pb: "env(safe-area-inset-bottom)"
       }} elevation={0}>
         <BottomNavigation 
           showLabels 
           value={view} 
           onChange={(_, v) => setView(v)} 
-          sx={{ height: 72 }}
+          sx={{ height: 64 }}
         >
           <BottomNavigationAction label="Pagos" icon={<DashboardIcon />} />
           <BottomNavigationAction label="Turnos" icon={<CalendarIcon />} />

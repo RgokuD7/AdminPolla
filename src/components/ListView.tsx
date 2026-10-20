@@ -21,7 +21,8 @@ import {
   Grid,
   LinearProgress,
   Chip,
-  Avatar
+  Avatar,
+  Tooltip
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -32,6 +33,7 @@ import {
   Logout as LogoutIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
+  SettingsBrightness as AutoModeIcon,
   CalendarMonth as CalendarIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
@@ -54,7 +56,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
 const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelete, onLogout }) => {
   const [open, setOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const { isDark, toggleMode } = useThemeMode();
+  const { themePreference, effectiveMode, toggleNextMode } = useThemeMode();
   
   const [form, setForm] = useState<AppSettings>({ 
     groupName: "", 
@@ -68,58 +70,67 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
   });
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4, pb: 14, px: 2, position: 'relative' }}>
-      {/* ─── Barra Superior de Acciones (Logout y Dark Mode) ─── */}
+    <Container maxWidth="sm" sx={{ py: 3, pb: 12, px: 2, position: 'relative' }}>
+      {/* ─── Barra Superior de Acciones (Logout y Selector de Modo) ─── */}
       <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mb: 1 }}>
-        <IconButton 
-          onClick={toggleMode} 
-          sx={{ 
-            color: isDark ? '#FBBF24' : 'text.secondary',
-            bgcolor: 'surface.muted',
-            border: 1,
-            borderColor: 'divider',
-            width: 42,
-            height: 42,
-            borderRadius: 2.5
-          }}
-        >
-          {isDark ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
-        </IconButton>
-        <IconButton 
-          onClick={onLogout} 
-          sx={{ 
-            color: 'text.secondary',
-            bgcolor: 'surface.muted',
-            border: 1,
-            borderColor: 'divider',
-            width: 42,
-            height: 42,
-            borderRadius: 2.5,
-            '&:hover': { color: 'error.main', bgcolor: 'surface.overdue' }
-          }}
-        >
-          <LogoutIcon fontSize="small" />
-        </IconButton>
+        <Tooltip title={`Tema: ${themePreference === 'system' ? 'Automático (según sistema)' : themePreference === 'light' ? 'Día (Claro)' : 'Noche (Oscuro)'}`}>
+          <IconButton 
+            onClick={toggleNextMode} 
+            sx={{ 
+              color: effectiveMode === 'dark' ? '#FBBF24' : 'text.secondary',
+              bgcolor: 'surface.muted',
+              border: 1,
+              borderColor: 'divider',
+              width: 38,
+              height: 38,
+              borderRadius: 2
+            }}
+          >
+            {themePreference === 'system' ? (
+              <AutoModeIcon fontSize="small" sx={{ color: 'secondary.main' }} />
+            ) : themePreference === 'dark' ? (
+              <DarkModeIcon fontSize="small" />
+            ) : (
+              <LightModeIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Cerrar sesión">
+          <IconButton 
+            onClick={onLogout} 
+            sx={{ 
+              color: 'text.secondary',
+              bgcolor: 'surface.muted',
+              border: 1,
+              borderColor: 'divider',
+              width: 38,
+              height: 38,
+              borderRadius: 2,
+              '&:hover': { color: 'error.main', bgcolor: 'surface.overdue' }
+            }}
+          >
+            <LogoutIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {/* ─── Hero Logo ─── */}
-      <Stack alignItems="center" spacing={1.5} sx={{ mb: 4, mt: 1 }}>
+      <Stack alignItems="center" spacing={1} sx={{ mb: 3.5, mt: 0.5 }}>
         <Box 
           component="img" 
           src="/logo.png" 
           sx={{ 
-            width: groups.length > 0 ? 80 : 130, 
-            height: groups.length > 0 ? 80 : 130,
+            width: groups.length > 0 ? 76 : 110, 
+            height: groups.length > 0 ? 76 : 110,
             objectFit: 'contain',
-            transition: 'all 0.4s ease',
-            filter: 'drop-shadow(0px 8px 16px rgba(0,0,0,0.1))'
+            transition: 'all 0.3s ease'
           }} 
         />
         <Typography 
-          variant={groups.length > 0 ? "h4" : "h3"} 
+          variant={groups.length > 0 ? "h5" : "h4"} 
           sx={{ 
             fontWeight: 900, 
-            letterSpacing: '-1px', 
+            letterSpacing: '-0.5px', 
             color: 'text.primary',
             lineHeight: 1
           }}
@@ -127,51 +138,51 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
           <Box component="span" sx={{ color: 'accent.main' }}>Admin</Box>
           <Box component="span" sx={{ color: 'secondary.main' }}>Polla</Box>
         </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: '0.08em' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.72rem', letterSpacing: '0.04em' }}>
           GESTIÓN COLABORATIVA DE TURNOS
         </Typography>
       </Stack>
 
       {/* ─── Título de Lista ─── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, px: 0.5 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, px: 0.5 }}>
         <Typography variant="h6" sx={{ fontWeight: 800 }}>
           Mis Grupos
         </Typography>
         {groups.length > 0 && (
           <Chip 
-            label={`${groups.length} ${groups.length === 1 ? 'polla activa' : 'pollas activas'}`} 
+            label={`${groups.length} ${groups.length === 1 ? 'grupo' : 'grupos'}`} 
             size="small" 
-            sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.75rem', height: 26 }} 
+            sx={{ bgcolor: 'surface.muted', fontWeight: 700, fontSize: '0.72rem', height: 24, borderRadius: 1.5 }} 
           />
         )}
       </Stack>
       
-      {/* ─── Lista de Tarjetas de Grupo ─── */}
-      <Stack spacing={2}>
+      {/* ─── Lista de Tarjetas de Grupo (Bordes Suaves 8-10px) ─── */}
+      <Stack spacing={1.5}>
         {groups.length === 0 ? (
           <Paper 
             variant="outlined" 
             sx={{ 
-              p: 6, 
+              p: 5, 
               textAlign: 'center', 
               borderStyle: 'dashed', 
-              borderWidth: 2,
+              borderWidth: 1.5,
               borderColor: 'divider',
               bgcolor: 'background.paper', 
-              borderRadius: 4 
+              borderRadius: 2.5 
             }}
           >
-            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, mb: 1 }}>
+            <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600, mb: 0.5 }}>
               No tienes grupos registrados aún
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
-              Crea tu primera polla para comenzar a gestionar los pagos y turnos de tus amigos o colegas.
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2.5 }}>
+              Crea tu primera polla para comenzar a gestionar los pagos y turnos.
             </Typography>
             <Button 
               variant="contained" 
               color="secondary"
               startIcon={<AddIcon />}
-              sx={{ px: 3.5, py: 1.5, minHeight: 48, fontWeight: 700, borderRadius: 3 }} 
+              sx={{ px: 3, py: 1.25, minHeight: 44, fontWeight: 700, borderRadius: 2 }} 
               onClick={() => setOpen(true)}
             >
               Crear Nueva Polla
@@ -189,32 +200,29 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                 key={group.id} 
                 onClick={() => onSelect(group.id)} 
                 sx={{ 
-                  p: 2.5,
+                  p: 2,
                   cursor: 'pointer', 
-                  transition: 'all 0.25s ease', 
-                  borderRadius: 4,
+                  transition: 'all 0.15s ease', 
+                  borderRadius: 2.5,
                   border: 1,
-                  borderColor: isCompleted ? 'success.main' : 'divider',
+                  borderColor: isCompleted ? 'secondary.main' : 'divider',
                   bgcolor: 'background.paper',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  boxShadow: 'none',
                   '&:hover': { 
-                    transform: 'translateY(-2px)', 
-                    boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
-                    borderColor: 'secondary.main'
+                    borderColor: 'secondary.main',
+                    bgcolor: 'surface.muted'
                   },
                   '&:active': { transform: 'scale(0.99)' }
                 }}
               >
                 {/* Cabecera de la Tarjeta */}
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                  <Box sx={{ pr: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2, color: 'text.primary' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+                  <Box sx={{ pr: 1.5 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2, color: 'text.primary', fontSize: '0.98rem' }}>
                       {group.settings.groupName}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                      <GroupsIcon sx={{ fontSize: 15 }} /> {group.participants.length} integrantes
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                      <GroupsIcon sx={{ fontSize: 14 }} /> {group.participants.length} integrantes
                     </Typography>
                   </Box>
                   <IconButton 
@@ -223,8 +231,8 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                     sx={{ 
                       color: 'text.secondary', 
                       '&:hover': { color: 'error.main', bgcolor: 'surface.overdue' },
-                      width: 36,
-                      height: 36
+                      width: 32,
+                      height: 32
                     }}
                   >
                     <DeleteIcon fontSize="small" />
@@ -232,33 +240,33 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                 </Stack>
 
                 {/* Info Financiera y Beneficiario */}
-                <Stack spacing={2}>
+                <Stack spacing={1.5}>
                   {/* Beneficiario de este turno */}
                   <Box sx={{ 
                     bgcolor: isCompleted ? 'surface.paid' : 'surface.muted', 
-                    p: 1.5, 
-                    borderRadius: 3, 
+                    p: 1.25, 
+                    borderRadius: 2, 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: 1.5,
+                    gap: 1.25,
                     border: 1,
                     borderColor: 'divider'
                   }}>
                     <Avatar sx={{ 
-                      width: 34, 
-                      height: 34, 
+                      width: 30, 
+                      height: 30, 
                       bgcolor: isCompleted ? 'success.main' : 'secondary.main', 
-                      fontSize: 14, 
+                      fontSize: 13, 
                       fontWeight: 800,
-                      borderRadius: 2.5
+                      borderRadius: 1.5
                     }}>
                       {currentTurn}
                     </Avatar>
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.05em' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.04em' }}>
                         TURNO #{currentTurn} • LE TOCA A:
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.85rem' }}>
                         {recipient ? getParticipantName(recipient) : "Sin asignar"}
                       </Typography>
                     </Box>
@@ -267,10 +275,10 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                   {/* Progreso de Recaudación */}
                   <Box>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: isCompleted ? 'success.main' : 'text.secondary' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: isCompleted ? 'secondary.main' : 'text.secondary', fontSize: '0.72rem' }}>
                         {isCompleted ? "🎉 ¡Cuota completa!" : "Recaudación actual"}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '0.75rem' }}>
                         {formatCurrency(stats.collected)}{" "}
                         <Typography component="span" variant="caption" color="text.secondary">
                           / {formatCurrency(stats.total)}
@@ -281,12 +289,12 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                       variant="determinate" 
                       value={Math.min(stats.progress, 100)} 
                       sx={{ 
-                        height: 7, 
-                        borderRadius: 3.5, 
+                        height: 6, 
+                        borderRadius: 3, 
                         bgcolor: 'surface.muted',
                         '& .MuiLinearProgress-bar': { 
                           bgcolor: isCompleted ? 'success.main' : 'secondary.main', 
-                          borderRadius: 3.5 
+                          borderRadius: 3 
                         } 
                       }} 
                     />
@@ -296,26 +304,28 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
                   <Stack direction="row" spacing={1} flexWrap="wrap">
                     <Chip 
                       size="small" 
-                      icon={<CalendarIcon sx={{ fontSize: '14px !important' }} />}
+                      icon={<CalendarIcon sx={{ fontSize: '13px !important' }} />}
                       label={FREQUENCY_LABELS[group.settings.frequency] || group.settings.frequency} 
                       sx={{ 
-                        height: 24, 
-                        fontSize: '0.7rem', 
+                        height: 22, 
+                        fontSize: '0.68rem', 
                         fontWeight: 700, 
                         bgcolor: 'surface.muted', 
-                        color: 'text.secondary' 
+                        color: 'text.secondary',
+                        borderRadius: 1.5
                       }} 
                     />
                     <Chip 
                       size="small" 
-                      icon={<MoneyIcon sx={{ fontSize: '14px !important' }} />}
+                      icon={<MoneyIcon sx={{ fontSize: '13px !important' }} />}
                       label={`${formatCurrency(group.settings.quotaAmount)} c/u`} 
                       sx={{ 
-                        height: 24, 
-                        fontSize: '0.7rem', 
+                        height: 22, 
+                        fontSize: '0.68rem', 
                         fontWeight: 700, 
                         bgcolor: 'surface.paid', 
                         color: 'secondary.main', 
+                        borderRadius: 1.5,
                         '& .MuiChip-icon': { color: 'secondary.main' } 
                       }} 
                     />
@@ -333,19 +343,19 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
         aria-label="crear"
         sx={{ 
           position: 'fixed', 
-          bottom: 28, 
-          right: 24, 
+          bottom: 24, 
+          right: 20, 
           bgcolor: 'secondary.main', 
           color: '#FFFFFF',
-          borderRadius: 3.5, 
-          width: 58,
-          height: 58,
-          boxShadow: '0 8px 24px rgba(5, 150, 105, 0.4)',
+          borderRadius: 2.5, 
+          width: 52,
+          height: 52,
+          boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
           '&:hover': { bgcolor: '#047857' }
         }} 
         onClick={() => setOpen(true)}
       >
-        <AddIcon sx={{ fontSize: 28 }} />
+        <AddIcon sx={{ fontSize: 26 }} />
       </Fab>
 
       {/* ─── Diálogo Crear Polla ─── */}
@@ -354,15 +364,16 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
         onClose={() => setOpen(false)} 
         fullWidth 
         maxWidth="xs" 
-        PaperProps={{ sx: { borderRadius: 4, bgcolor: 'background.paper' } }}
+        PaperProps={{ sx: { borderRadius: 2.5, bgcolor: 'background.paper' } }}
       >
-        <DialogTitle sx={{ pt: 3, fontWeight: 900 }}>Crear Nueva Polla</DialogTitle>
+        <DialogTitle sx={{ pt: 2.5, fontWeight: 900 }}>Crear Nueva Polla</DialogTitle>
         <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
+          <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField 
               label="Nombre del Grupo" 
               fullWidth 
-              placeholder="Ej: Polla de Amigos, Familia..."
+              size="small"
+              placeholder="Ej: Polla Amigos, Familia..."
               value={form.groupName} 
               onChange={e => setForm({...form, groupName: e.target.value})} 
             />
@@ -371,6 +382,7 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
               label="Monto de la Cuota" 
               type="text" 
               fullWidth 
+              size="small"
               value={form.quotaAmount === 0 ? '' : new Intl.NumberFormat('es-CL').format(form.quotaAmount)} 
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/\./g, '');
@@ -385,7 +397,7 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
               }} 
             />
 
-            <FormControl fullWidth>
+            <FormControl fullWidth size="small">
               <InputLabel>Frecuencia de Pago</InputLabel>
               <Select 
                 label="Frecuencia de Pago" 
@@ -398,11 +410,11 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             </FormControl>
 
             {form.frequency === 'biweekly' ? (
-              <Box sx={{ bgcolor: 'surface.muted', p: 2, borderRadius: 3, border: 1, borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 1.5, fontWeight: 700 }}>
+              <Box sx={{ bgcolor: 'surface.muted', p: 1.5, borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 1, fontWeight: 700 }}>
                   DÍAS DE GRACIA (TOLERANCIA)
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={1.5}>
                   <Grid item xs={6}>
                     <TextField 
                       label="Quincena (15)" 
@@ -432,9 +444,10 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             ) : (
               <TextField 
                 label="Días de Gracia" 
-                helperText="Días de tolerancia para pagar después del vencimiento"
+                helperText="Días para pagar tras el vencimiento"
                 type="number" 
                 fullWidth 
+                size="small"
                 value={form.graceDays1 || ''} 
                 onChange={(e) => setForm({ ...form, graceDays1: Number(e.target.value) })}
                 InputProps={{
@@ -444,21 +457,22 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
             )}
 
             <TextField 
-              label="Fecha de Inicio (Primer Turno)" 
+              label="Fecha de Inicio" 
               type="date" 
               fullWidth 
+              size="small"
               value={form.startDate} 
               onChange={e => setForm({...form, startDate: e.target.value})} 
               InputLabelProps={{ shrink: true }} 
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5, pt: 1 }}>
+        <DialogActions sx={{ p: 2, pt: 0.5 }}>
           <Button onClick={() => setOpen(false)} color="inherit" sx={{ fontWeight: 700 }}>Cancelar</Button>
           <Button 
             variant="contained" 
             color="secondary"
-            sx={{ fontWeight: 700, minHeight: 44, px: 3 }}
+            sx={{ fontWeight: 700, minHeight: 40, px: 2.5, borderRadius: 2 }}
             onClick={() => { 
               if (form.groupName.trim()) { 
                 const realTurn = calculateCurrentTurnFromDate(form);
@@ -477,20 +491,20 @@ const ListView: React.FC<ListViewProps> = ({ groups, onSelect, onCreate, onDelet
       <Dialog 
         open={!!deleteId} 
         onClose={() => setDeleteId(null)} 
-        PaperProps={{ sx: { borderRadius: 4, bgcolor: 'background.paper' } }}
+        PaperProps={{ sx: { borderRadius: 2.5, bgcolor: 'background.paper' } }}
       >
         <DialogTitle sx={{ fontWeight: 900 }}>¿Eliminar este grupo?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            Esta acción eliminará el grupo permanentemente junto con todo su historial de pagos y lista de participantes.
+            Esta acción eliminará el grupo permanentemente junto con todo su historial.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
+        <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setDeleteId(null)} color="inherit" sx={{ fontWeight: 700 }}>Cancelar</Button>
           <Button 
             variant="contained" 
             color="error" 
-            sx={{ fontWeight: 700 }}
+            sx={{ fontWeight: 700, borderRadius: 2 }}
             onClick={() => { 
               if (deleteId) { 
                 onDelete(deleteId); 

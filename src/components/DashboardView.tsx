@@ -19,7 +19,6 @@ import {
   FormControlLabel,
   Chip,
   TextField,
-  Tooltip,
   Collapse
 } from "@mui/material";
 import {
@@ -82,11 +81,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   const [copiedBank, setCopiedBank] = useState(false);
   const [expandedShared, setExpandedShared] = useState<Record<string, boolean>>({});
 
-  // Estado para pagos relacionados (misma persona, otros turnos)
   const [relatedPayments, setRelatedPayments] = useState<{ id: string, memberIndex?: number, turnNumber: number }[]>([]);
   const [payRelated, setPayRelated] = useState(false);
 
-  // Helper para saber si alguien pagó el turno actual
   const isParticipantPaid = (p: Participant, turn: number) => {
     return p.paymentHistory?.[turn] ?? false;
   };
@@ -256,7 +253,6 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
     });
   }, [participants, searchQuery]);
 
-  // Extraer datos bancarios del receptor actual si existen
   const recipientBankDetails = useMemo(() => {
     if (!stats.recipient) return null;
     const details = stats.recipient.members
@@ -276,48 +272,42 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
 
   return (
     <Box sx={{ pb: 16 }}>
-      {/* ─── Hero Card Superior (Gradiente Premium Financiero) ─── */}
+      {/* ─── Encabezado de Recaudación (CLARO en Modo Día, Oscuro en Modo Noche) ─── */}
       <Box 
         sx={{ 
-          pt: { xs: 5, sm: 6 }, 
-          pb: { xs: 5, sm: 6 }, 
-          px: 3, 
-          background: (theme) => stats.isFullyPaid
-            ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-            : theme.palette.mode === 'light'
-              ? 'linear-gradient(135deg, #111827 0%, #1F2937 60%, #0F172A 100%)'
-              : 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-          color: '#FFFFFF',
-          borderRadius: { xs: '0 0 28px 28px', sm: '0 0 32px 32px' },
-          boxShadow: '0 12px 30px -10px rgba(0,0,0,0.3)',
-          transition: 'background 0.5s ease'
+          pt: 3.5, 
+          pb: 3.5, 
+          px: 2.5, 
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider',
+          transition: 'background-color 0.2s ease'
         }}
       >
         <Container maxWidth="sm" disableGutters>
-          <Stack spacing={2.5}>
-            {/* Header con nombre del grupo y badge */}
+          <Stack spacing={2}>
+            {/* Header: Nombre del grupo y Turno */}
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Chip
-                label={settings.groupName || "Mi Polla"}
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  color: '#FFFFFF',
-                  backdropFilter: 'blur(10px)',
-                  fontWeight: 700,
-                  fontSize: '0.75rem',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase'
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: 'text.secondary', 
+                  fontWeight: 700, 
+                  letterSpacing: '0.05em'
                 }}
-              />
+              >
+                {settings.groupName || "Mi Polla"}
+              </Typography>
               <Chip
                 label={`Turno #${settings.currentTurn}`}
                 size="small"
                 sx={{
-                  bgcolor: stats.isFullyPaid ? '#FFFFFF' : 'rgba(255,255,255,0.2)',
-                  color: stats.isFullyPaid ? '#047857' : '#FFFFFF',
+                  bgcolor: stats.isFullyPaid ? 'surface.paid' : 'surface.muted',
+                  color: stats.isFullyPaid ? 'secondary.main' : 'text.primary',
                   fontWeight: 800,
-                  fontSize: '0.75rem'
+                  fontSize: '0.75rem',
+                  border: 1,
+                  borderColor: 'divider'
                 }}
               />
             </Stack>
@@ -327,11 +317,11 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               <Typography 
                 variant="caption" 
                 sx={{ 
-                  color: 'rgba(255,255,255,0.7)', 
+                  color: 'text.secondary', 
                   fontWeight: 600, 
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.04em',
                   display: 'block',
-                  mb: 0.5
+                  mb: 0.25
                 }}
               >
                 RECAUDACIÓN TURNO ACTUAL
@@ -342,9 +332,9 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   component="span"
                   sx={{ 
                     fontWeight: 900, 
-                    color: '#FFFFFF',
-                    fontSize: { xs: '2.4rem', sm: '3rem' },
-                    lineHeight: 1
+                    color: stats.isFullyPaid ? 'secondary.main' : 'text.primary',
+                    fontSize: { xs: '2.2rem', sm: '2.8rem' },
+                    lineHeight: 1.1
                   }}
                 >
                   {formatCurrency(stats.collected)}
@@ -353,7 +343,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   variant="subtitle1" 
                   component="span"
                   sx={{ 
-                    color: 'rgba(255,255,255,0.6)', 
+                    color: 'text.secondary', 
                     fontWeight: 600 
                   }}
                 >
@@ -363,7 +353,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   <IconButton 
                     size="small" 
                     onClick={() => triggerConfetti()} 
-                    sx={{ color: '#FCD34D', bgcolor: 'rgba(255,255,255,0.1)', ml: 1 }}
+                    sx={{ color: 'warning.main', ml: 0.5 }}
                   >
                     <CelebrationIcon fontSize="small" />
                   </IconButton>
@@ -377,12 +367,12 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 variant="determinate" 
                 value={Math.min(stats.progress, 100)} 
                 sx={{ 
-                  height: 8, 
-                  borderRadius: 4, 
-                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  height: 6, 
+                  borderRadius: 3, 
+                  bgcolor: 'surface.muted', 
                   '& .MuiLinearProgress-bar': { 
-                    bgcolor: stats.isFullyPaid ? '#A7F3D0' : '#10B981',
-                    borderRadius: 4 
+                    bgcolor: stats.isFullyPaid ? 'success.main' : 'secondary.main',
+                    borderRadius: 3 
                   } 
                 }} 
               />
@@ -390,8 +380,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 <Typography 
                   variant="caption" 
                   sx={{ 
-                    color: stats.isFullyPaid ? '#A7F3D0' : '#FFFFFF', 
-                    fontWeight: 800,
+                    color: stats.isFullyPaid ? 'secondary.main' : 'text.secondary', 
+                    fontWeight: 700,
                     fontSize: '0.75rem' 
                   }}
                 >
@@ -399,9 +389,9 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 </Typography>
                 <Typography 
                   variant="caption" 
-                  sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '0.75rem' }}
+                  sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.75rem' }}
                 >
-                  {participants.filter(p => isParticipantPaid(p, settings.currentTurn)).length} de {participants.length} cuotas
+                  {participants.filter(p => isParticipantPaid(p, settings.currentTurn)).length} de {participants.length} cuotas completas
                 </Typography>
               </Stack>
             </Box>
@@ -410,7 +400,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
       </Box>
 
       {/* ─── Contenido Principal ─── */}
-      <Container maxWidth="sm" sx={{ mt: 3, px: 2 }}>
+      <Container maxWidth="sm" sx={{ mt: 2.5, px: 2 }}>
         
         {/* Alerta de Atraso por Fecha */}
         {(() => {
@@ -422,10 +412,10 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 variant="filled"
                 icon={<EventIcon fontSize="inherit" />}
                 sx={{ 
-                  mb: 3, 
-                  borderRadius: 3, 
+                  mb: 2.5, 
+                  borderRadius: 2, 
                   fontWeight: 700, 
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.25)' 
+                  boxShadow: 'none' 
                 }}
               >
                 ¡PAGOS ATRASADOS! Según la fecha, deberíamos ir en el Turno #{realTurn}. No avanzará hasta completar los pagos.
@@ -435,59 +425,59 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           return null;
         })()}
 
-        {/* ─── Card Destacada del Receptor ─── */}
+        {/* ─── Card del Receptor (Bordes Sobrios 8-10px) ─── */}
         <Paper 
           sx={{ 
-            mb: 3, 
-            borderRadius: 4, 
+            mb: 2.5, 
+            borderRadius: 2.5, 
             overflow: 'hidden',
             border: 1,
-            borderColor: stats.isFullyPaid ? 'success.main' : 'divider',
-            bgcolor: stats.isFullyPaid ? 'surface.paid' : 'background.paper',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-            transition: 'all 0.3s ease'
+            borderColor: stats.isFullyPaid ? 'secondary.main' : 'divider',
+            bgcolor: 'background.paper',
+            boxShadow: 'none'
           }}
         >
-          {/* Header de la tarjeta */}
           <Box 
             sx={{ 
-              bgcolor: stats.isFullyPaid ? 'secondary.main' : 'surface.muted', 
-              color: stats.isFullyPaid ? '#FFFFFF' : 'text.primary', 
-              px: 2.5, 
-              py: 1.25, 
+              bgcolor: stats.isFullyPaid ? 'surface.paid' : 'surface.muted', 
+              color: 'text.primary', 
+              px: 2, 
+              py: 1, 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              borderBottom: 1,
+              borderColor: 'divider'
             }}
           >
             <Stack direction="row" alignItems="center" spacing={1}>
               {stats.isFullyPaid ? (
-                <CheckCircleIcon sx={{ fontSize: 18 }} />
+                <CheckCircleIcon sx={{ fontSize: 16, color: 'secondary.main' }} />
               ) : (
-                <ScheduleIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+                <ScheduleIcon sx={{ fontSize: 16, color: 'warning.main' }} />
               )}
-              <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.06em' }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: '0.04em' }}>
                 {stats.isFullyPaid ? "LISTO PARA ENTREGAR" : "RECEPTOR DE ESTE TURNO"}
               </Typography>
             </Stack>
             <Chip 
-              icon={<EventIcon sx={{ fontSize: '15px !important' }} />}
+              icon={<EventIcon sx={{ fontSize: '14px !important' }} />}
               label={formatDateReadable(stats.deadlineDate)}
               size="small"
               sx={{ 
-                height: 24,
-                fontSize: '0.7rem',
+                height: 22,
+                fontSize: '0.68rem',
                 fontWeight: 700,
-                bgcolor: stats.isFullyPaid ? 'rgba(255,255,255,0.2)' : 'surface.elevated',
-                color: stats.isFullyPaid ? '#FFFFFF' : 'text.secondary'
+                bgcolor: 'background.paper',
+                border: 1,
+                borderColor: 'divider'
               }}
             />
           </Box>
 
-          {/* Cuerpo */}
-          <Box sx={{ p: 2.5 }}>
+          <Box sx={{ p: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Box sx={{ flex: 1, pr: 2 }}>
+              <Box sx={{ flex: 1, pr: 1.5 }}>
                 <Typography 
                   variant="caption" 
                   color="text.secondary" 
@@ -496,27 +486,25 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: 0.5,
-                    textTransform: 'uppercase',
-                    fontSize: '0.7rem'
+                    fontSize: '0.68rem'
                   }}
                 >
-                  {stats.recipient?.type === 'shared' ? <GroupsIcon sx={{ fontSize: 16 }} /> : <PersonIcon sx={{ fontSize: 16 }} />}
+                  {stats.recipient?.type === 'shared' ? <GroupsIcon sx={{ fontSize: 15 }} /> : <PersonIcon sx={{ fontSize: 15 }} />}
                   {stats.recipient?.type === 'shared' ? 'Beneficiarios (Compartido)' : 'Beneficiario'}
                 </Typography>
                 <Typography 
                   variant="h5" 
                   sx={{ 
-                    mt: 0.5, 
+                    mt: 0.25, 
                     fontWeight: 900, 
                     color: 'text.primary',
-                    letterSpacing: '-0.02em',
                     lineHeight: 1.2
                   }}
                 >
                   {stats.recipient ? getParticipantName(stats.recipient) : "Sin asignar"}
                 </Typography>
                 {stats.individualAmount && (
-                  <Typography variant="body2" sx={{ color: 'secondary.main', fontWeight: 700, mt: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: 'secondary.main', fontWeight: 700, mt: 0.25 }}>
                     {formatCurrency(stats.individualAmount)} para cada uno
                   </Typography>
                 )}
@@ -526,25 +514,25 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                 elevation={0} 
                 sx={{ 
                   bgcolor: 'surface.muted', 
-                  px: 2, 
-                  py: 1.2, 
-                  borderRadius: 3, 
+                  px: 1.5, 
+                  py: 1, 
+                  borderRadius: 2, 
                   border: 1, 
                   borderColor: 'divider',
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
-                  minWidth: 70
+                  minWidth: 64
                 }}
               >
-                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.65rem' }}>TURNO</Typography>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: 'secondary.main', lineHeight: 1 }}>#{settings.currentTurn}</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', fontSize: '0.6rem' }}>TURNO</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: 'secondary.main', lineHeight: 1 }}>#{settings.currentTurn}</Typography>
               </Paper>
             </Stack>
 
-            {/* Botón para copiar datos bancarios del receptor si existen */}
+            {/* Botón para copiar datos bancarios */}
             {recipientBankDetails && (
-              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
                 <Button
                   fullWidth
                   variant="outlined"
@@ -552,8 +540,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   onClick={handleCopyBank}
                   startIcon={copiedBank ? <CheckIcon color="success" /> : <BankIcon />}
                   sx={{
-                    borderRadius: 2.5,
-                    py: 1,
+                    borderRadius: 2,
+                    py: 0.8,
                     borderColor: 'divider',
                     color: 'text.primary',
                     fontWeight: 700,
@@ -570,16 +558,15 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
         </Paper>
 
         {/* ─── Botones de Acción (Copiar / Compartir) ─── */}
-        <Stack direction="row" spacing={1.5} sx={{ mb: 3.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
           <Button 
             variant="outlined" 
             fullWidth
             onClick={handleCopyReport}
             startIcon={<ContentCopyIcon />}
             sx={{ 
-              borderRadius: 3, 
-              py: 1.5, 
-              minHeight: 48,
+              borderRadius: 2, 
+              py: 1.2, 
               borderColor: 'divider', 
               color: 'text.primary', 
               fontWeight: 700,
@@ -596,31 +583,30 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             onClick={() => {
               const url = `${window.location.origin}/view/${groupId}`;
               navigator.clipboard.writeText(url);
-              setSnackbar({ open: true, message: "Enlace público copiado al portapapeles", pid: "" });
+              setSnackbar({ open: true, message: "Enlace público copiado", pid: "" });
             }}
             startIcon={<ShareIcon />}
             sx={{ 
-              borderRadius: 3, 
-              py: 1.5, 
-              minHeight: 48,
+              borderRadius: 2, 
+              py: 1.2, 
               fontWeight: 700, 
               bgcolor: 'accent.main',
               color: '#FFFFFF',
-              '&:hover': { bgcolor: '#2563EB' }
+              '&:hover': { bgcolor: '#1D4ED8' }
             }}
           >
             Compartir Link
           </Button>
         </Stack>
 
-        {/* ─── Lista de Integrantes (Diseño Pill/Row Limpio) ─── */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, px: 0.5 }}>
+        {/* ─── Lista de Integrantes (Diseño Sobrio y Limpio) ─── */}
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, px: 0.5 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography variant="h6" sx={{ fontWeight: 800 }}>Integrantes</Typography>
             <Chip 
               label={participants.length} 
               size="small" 
-              sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.75rem', height: 24 }} 
+              sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.72rem', height: 22 }} 
             />
           </Stack>
           <Button 
@@ -630,10 +616,10 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             startIcon={isMarkingMode ? <DoneAllIcon /> : <EditIcon />}
             onClick={() => setIsMarkingMode(!isMarkingMode)}
             sx={{ 
-              borderRadius: 2.5, 
-              px: 2, 
-              height: 38, 
-              fontSize: '0.8rem',
+              borderRadius: 2, 
+              px: 1.5, 
+              height: 34, 
+              fontSize: '0.78rem',
               fontWeight: 700,
               borderColor: 'divider'
             }}
@@ -649,28 +635,27 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 20 }} />,
+            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: 18 }} />,
           }}
           sx={{ 
-            mb: 2.5, 
+            mb: 2, 
             '& .MuiOutlinedInput-root': {
               bgcolor: 'background.paper',
-              borderRadius: 3,
+              borderRadius: 2,
               fontSize: '16px'
             }
           }}
           size="small"
         />
 
-        {/* Contenedor Unificado de Integrantes */}
+        {/* Contenedor de Integrantes con curvas sobrias */}
         <Paper 
           sx={{ 
-            borderRadius: 4, 
+            borderRadius: 2.5, 
             overflow: 'hidden', 
             border: 1, 
             borderColor: 'divider',
-            bgcolor: 'background.paper',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+            bgcolor: 'background.paper'
           }}
         >
           {filteredParticipants.length === 0 ? (
@@ -699,13 +684,13 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                       onIntentToggle(p);
                     }}
                     sx={{
-                      p: 2,
+                      p: 1.75,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 2,
+                      gap: 1.5,
                       cursor: 'pointer',
                       bgcolor: isPaid ? 'surface.paid' : 'transparent',
-                      transition: 'background-color 0.2s ease',
+                      transition: 'background-color 0.15s ease',
                       '&:hover': {
                         bgcolor: isPaid ? 'surface.paid' : 'surface.muted'
                       },
@@ -716,8 +701,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                     {/* Avatar con número de turno */}
                     <Avatar 
                       sx={{ 
-                        width: 38, 
-                        height: 38, 
+                        width: 34, 
+                        height: 34, 
                         bgcolor: isRecipient 
                           ? 'secondary.main' 
                           : isPaid 
@@ -725,8 +710,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                             : 'surface.muted',
                         color: isRecipient || isPaid ? '#FFFFFF' : 'text.primary',
                         fontWeight: 800,
-                        fontSize: '0.85rem',
-                        borderRadius: 2.5
+                        fontSize: '0.8rem',
+                        borderRadius: 1.5
                       }}
                     >
                       {p.turnNumber}
@@ -734,7 +719,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
 
                     {/* Nombre y detalles */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction="row" spacing={0.75} alignItems="center">
                         <Typography 
                           variant="subtitle1" 
                           sx={{ 
@@ -742,7 +727,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                             lineHeight: 1.2,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis'
+                            textOverflow: 'ellipsis',
+                            fontSize: '0.9rem'
                           }}
                         >
                           {isShared ? p.members.map(m => m.name).join(' y ') : p.members[0].name}
@@ -752,8 +738,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                             label="Compartido" 
                             size="small" 
                             sx={{ 
-                              height: 20, 
-                              fontSize: '0.65rem', 
+                              height: 18, 
+                              fontSize: '0.62rem', 
                               fontWeight: 700,
                               bgcolor: 'surface.muted',
                               color: 'text.secondary' 
@@ -761,27 +747,27 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                           />
                         )}
                       </Stack>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', mt: 0.25, display: 'block' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem', mt: 0.2, display: 'block' }}>
                         Turno #{p.turnNumber} {isRecipient ? '• 👑 Receptor actual' : ''}
                       </Typography>
                     </Box>
 
                     {/* Estado de pago a la derecha */}
                     {!isShared ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {isMarkingMode ? (
                           isPaid ? (
                             <Chip
                               label="DESMARCAR"
                               size="small"
-                              icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
+                              icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
                               sx={{
                                 bgcolor: 'success.main',
                                 color: '#FFFFFF',
                                 fontWeight: 800,
-                                fontSize: '0.7rem',
-                                height: 30,
-                                px: 0.5,
+                                fontSize: '0.68rem',
+                                height: 28,
+                                borderRadius: 1.5,
                                 '& .MuiChip-icon': { color: '#FFFFFF' }
                               }}
                             />
@@ -789,14 +775,14 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                             <Chip
                               label="MARCAR"
                               size="small"
-                              icon={<EditIcon sx={{ fontSize: '14px !important' }} />}
+                              icon={<EditIcon sx={{ fontSize: '13px !important' }} />}
                               sx={{
                                 bgcolor: 'surface.muted',
                                 color: 'text.primary',
                                 fontWeight: 800,
-                                fontSize: '0.7rem',
-                                height: 30,
-                                px: 0.5
+                                fontSize: '0.68rem',
+                                height: 28,
+                                borderRadius: 1.5
                               }}
                             />
                           )
@@ -804,36 +790,37 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                           <Chip
                             label={isPaid ? "PAGADO" : "PENDIENTE"}
                             size="small"
-                            icon={<DotIcon sx={{ fontSize: '12px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
+                            icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
                             sx={{
                               bgcolor: isPaid ? 'surface.paid' : 'surface.pending',
                               color: isPaid ? 'success.main' : 'warning.main',
                               fontWeight: 800,
-                              fontSize: '0.7rem',
-                              height: 26,
+                              fontSize: '0.68rem',
+                              height: 24,
+                              borderRadius: 1.5,
                               border: 1,
-                              borderColor: isPaid ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'
+                              borderColor: isPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
                             }}
                           />
                         )}
                       </Box>
                     ) : (
-                      // Indicador para participantes compartidos
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <Chip
                           label={isPaid ? "PAGADO" : "COMPARTIDO"}
                           size="small"
-                          icon={<DotIcon sx={{ fontSize: '12px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
+                          icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
                           sx={{
                             bgcolor: isPaid ? 'surface.paid' : 'surface.pending',
                             color: isPaid ? 'success.main' : 'warning.main',
                             fontWeight: 800,
-                            fontSize: '0.7rem',
-                            height: 26
+                            fontSize: '0.68rem',
+                            height: 24,
+                            borderRadius: 1.5
                           }}
                         />
-                        <IconButton size="small" sx={{ p: 0.5, color: 'text.secondary' }}>
-                          <ExpandMoreIcon sx={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                        <IconButton size="small" sx={{ p: 0.25, color: 'text.secondary' }}>
+                          <ExpandMoreIcon sx={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s', fontSize: 18 }} />
                         </IconButton>
                       </Stack>
                     )}
@@ -843,7 +830,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                   {isShared && (
                     <Collapse in={isExpanded || isMarkingMode}>
                       <Box sx={{ bgcolor: 'surface.muted', py: 1, px: 2, borderBottom: hasDivider ? 1 : 0, borderColor: 'divider' }}>
-                        <Stack spacing={1}>
+                        <Stack spacing={0.75}>
                           {p.members.map((m, mIdx) => {
                             const isMemberPaid = isSharedMemberPaid(p, mIdx, settings.currentTurn);
                             return (
@@ -855,27 +842,24 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                                   onIntentToggle(p, mIdx);
                                 }}
                                 sx={{
-                                  p: 1.5,
-                                  px: 2,
+                                  p: 1.25,
+                                  px: 1.75,
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  borderRadius: 2.5,
+                                  borderRadius: 1.5,
                                   bgcolor: isMemberPaid ? 'surface.paid' : 'background.paper',
                                   border: 1,
                                   borderColor: isMemberPaid ? 'success.main' : 'divider',
                                   cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  '&:hover': {
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
-                                  }
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
                                 <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
                                     {m.name}
                                   </Typography>
-                                  <Typography variant="caption" color="text.secondary">
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                                     Cuota: {formatCurrency(Math.floor(settings.quotaAmount / p.members.length))}
                                   </Typography>
                                 </Box>
@@ -889,7 +873,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                                     color: isMemberPaid ? 'success.main' : 'warning.main',
                                     fontWeight: 800,
                                     fontSize: '0.65rem',
-                                    height: 24
+                                    height: 22,
+                                    borderRadius: 1.5
                                   }}
                                 />
                               </Paper>
@@ -912,38 +897,38 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
         onClose={() => setConfirmPayment({ open: false, p: null })} 
         PaperProps={{ 
           sx: { 
-            borderRadius: 4, 
+            borderRadius: 2.5, 
             width: '100%', 
-            maxWidth: 380,
+            maxWidth: 360,
             p: 1,
             bgcolor: 'background.paper'
           } 
         }}
       >
-        <DialogTitle sx={{ textAlign: 'center', pt: 3, pb: 1, fontWeight: 900 }}>
+        <DialogTitle sx={{ textAlign: 'center', pt: 2.5, pb: 0.5, fontWeight: 900 }}>
           Confirmar Estado de Pago
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', pb: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 900, mb: 0.5, color: 'text.primary' }}>
+          <Typography variant="h6" sx={{ fontWeight: 900, mb: 0.5, color: 'text.primary' }}>
             {confirmPayment.p && typeof confirmPayment.memberIndex === 'number' && confirmPayment.p.type === 'shared'
               ? confirmPayment.p.members[confirmPayment.memberIndex].name
               : (confirmPayment.p ? getParticipantName(confirmPayment.p) : "")}
           </Typography>
           
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 2, fontWeight: 600 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontWeight: 600 }}>
             {confirmPayment.p?.type === 'shared' 
               ? formatCurrency(settings.quotaAmount / confirmPayment.p.members.length)
               : formatCurrency(settings.quotaAmount)}
           </Typography>
 
-          <Box sx={{ bgcolor: 'surface.pending', color: 'warning.main', p: 1.5, borderRadius: 2.5, display: 'inline-block' }}>
+          <Box sx={{ bgcolor: 'surface.pending', color: 'warning.main', p: 1.25, borderRadius: 2, display: 'inline-block' }}>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               ¿Deseas cambiar el estado del turno #{settings.currentTurn}?
             </Typography>
           </Box>
           
           {relatedPayments.length > 0 && (
-            <Box sx={{ mt: 2.5, textAlign: 'left', bgcolor: 'surface.muted', p: 1.5, borderRadius: 3, border: 1, borderColor: 'divider' }}>
+            <Box sx={{ mt: 2, textAlign: 'left', bgcolor: 'surface.muted', p: 1.25, borderRadius: 2, border: 1, borderColor: 'divider' }}>
               <FormControlLabel 
                 sx={{ mr: 0 }}
                 control={
@@ -963,15 +948,15 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2.5, pt: 0, justifyContent: 'center', gap: 1 }}>
+        <DialogActions sx={{ p: 2, pt: 0, justifyContent: 'center', gap: 1 }}>
           <Button 
             fullWidth 
             variant="outlined" 
             onClick={() => setConfirmPayment({ open: false, p: null })} 
             sx={{ 
-              borderRadius: 3, 
+              borderRadius: 2, 
               fontWeight: 700, 
-              minHeight: 48, 
+              minHeight: 44, 
               borderColor: 'divider', 
               color: 'text.secondary' 
             }}
@@ -1009,8 +994,8 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               setConfirmPayment({ open: false, p: null }); 
             }} 
             sx={{ 
-              minHeight: 48, 
-              borderRadius: 3, 
+              minHeight: 44, 
+              borderRadius: 2, 
               fontWeight: 700,
               bgcolor: 'secondary.main',
               color: '#FFFFFF'
@@ -1021,13 +1006,13 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
         </DialogActions>
       </Dialog>
 
-      {/* ─── Snackbar de Notificación ─── */}
+      {/* ─── Snackbar ─── */}
       <Snackbar 
         open={snackbar.open} 
         autoHideDuration={3000} 
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ bottom: { xs: 85, sm: 85 } }}
+        sx={{ bottom: { xs: 80, sm: 80 } }}
       >
         <Alert 
           onClose={() => setSnackbar({ ...snackbar, open: false })}
@@ -1035,11 +1020,10 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           variant="filled" 
           sx={{ 
             width: '100%', 
-            borderRadius: 3.5, 
+            borderRadius: 2, 
             bgcolor: 'primary.main', 
             color: 'primary.contrastText',
             fontWeight: 700,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
             alignItems: 'center',
             '& .MuiAlert-icon': { color: 'secondary.main' }
           }} 
