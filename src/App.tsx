@@ -309,6 +309,7 @@ const App = () => {
           onUpdateParticipant={(updatedP) => updateActiveGroupParticipants(
             activeGroup.participants.map(p => p.id === updatedP.id ? updatedP : p)
           )}
+          onUpdateAllParticipants={updateActiveGroupParticipants}
           onRemoveParticipant={(pid) => updateActiveGroupParticipants(
             activeGroup.participants.filter(p => p.id !== pid).map((p, i) => ({ ...p, turnNumber: i + 1 }))
           )} 

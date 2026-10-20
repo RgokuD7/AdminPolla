@@ -151,19 +151,25 @@ const PublicTurnsView = () => {
 
     setIsLinking(true);
     try {
-      await PollaService.linkUserToParticipant(
+      const result = await PollaService.linkUserToParticipant(
         group.id,
         selectedSlot.participantId,
         {
           uid: authUser.uid,
           email: authUser.email || "",
           name: authUser.displayName || "",
+          phone: userProfile?.phone || "",
           bankDetails: userProfile?.bankDetails
         },
-        selectedSlot.memberIndex
+        selectedSlot.memberIndex,
+        true
       );
 
-      setFeedback("¡Te has vinculado exitosamente a este turno!");
+      if (result.linkedTurns.length > 1) {
+        setFeedback(`¡Vinculado con éxito a todos tus turnos (#${result.linkedTurns.join(', #')})!`);
+      } else {
+        setFeedback(`¡Te has vinculado exitosamente al Turno #${result.linkedTurns[0] || ''}!`);
+      }
       setLinkDialogOpen(false);
       await fetchGroup();
     } catch (err) {

@@ -44,7 +44,9 @@ import {
   AccountBalance as BankIcon,
   ExpandMore as ExpandIcon,
   Close as CloseIcon,
-  DragIndicator as DragIndicatorIcon
+  DragIndicator as DragIndicatorIcon,
+  CheckCircle as CheckCircleIcon,
+  Person as PersonIcon
 } from "@mui/icons-material";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { AppSettings, Participant } from "@/types";
@@ -54,12 +56,14 @@ import {
   formatDateFull, 
   getParticipantName 
 } from "@/utils/helpers";
+import { UserService } from "@/services/firestore";
 
 interface TurnsViewProps { 
   participants: Participant[];
   settings: AppSettings;
   onAddParticipant: (p: Participant) => void;
   onUpdateParticipant: (p: Participant) => void;
+  onUpdateAllParticipants?: (ps: Participant[]) => void;
   onRemoveParticipant: (id: string) => void;
   onShuffle: () => void;
   onReorder: (from: number, to: number) => void;
@@ -74,6 +78,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
   settings,
   onAddParticipant, 
   onUpdateParticipant,
+  onUpdateAllParticipants,
   onRemoveParticipant, 
   onShuffle, 
   onReorder, 
@@ -107,9 +112,28 @@ const TurnsView: React.FC<TurnsViewProps> = ({
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [targetDate, setTargetDate] = useState("");
 
+  // P2P Multi-Turn Sync & User Assignment State
+  const [syncAllMatchingTurns, setSyncAllMatchingTurns] = useState(true);
+  const [userSearchEmail, setUserSearchEmail] = useState("");
+  const [userSearching, setUserSearching] = useState(false);
+  const [userSearchFeedback, setUserSearchFeedback] = useState("");
+
   const sortedParticipants = useMemo(() => {
     return [...participants].sort((a, b) => a.turnNumber - b.turnNumber);
   }, [participants]);
+
+  // Detectar si este participante tiene otros turnos en la polla con el mismo nombre
+  const relatedTurnNumbers = useMemo(() => {
+    if (!editingParticipant) return [];
+    const targetNames = editingParticipant.members
+      .map(m => m.name.trim().toLowerCase())
+      .filter(Boolean);
+    if (targetNames.length === 0) return [];
+    return participants
+      .filter(p => p.id !== editingParticipant.id && p.members.some(m => targetNames.includes(m.name.trim().toLowerCase())))
+      .map(p => p.turnNumber)
+      .sort((a, b) => a - b);
+  }, [editingParticipant, participants]);
 
   const availableDates = useMemo(() => {
     const dates = [];
@@ -189,9 +213,62 @@ const TurnsView: React.FC<TurnsViewProps> = ({
 
   const handleSaveEdit = () => {
     if (editingParticipant) {
-      onUpdateParticipant(editingParticipant);
+      if (syncAllMatchingTurns && relatedTurnNumbers.length > 0 && onUpdateAllParticipants) {
+        // Actualizar todos los turnos que compartan el mismo nombre con la cuenta y datos asignados
+        const targetNames = editingParticipant.members
+          .map(m => m.name.trim().toLowerCase())
+          .filter(Boolean);
+
+        const updatedAll = participants.map(p => {
+          if (p.id === editingParticipant.id) return editingParticipant;
+
+          if (p.type === 'shared') {
+            const updatedMembers = p.members.map(m => {
+              const matchedIdx = editingParticipant.members.findIndex(em => em.name.trim().toLowerCase() === m.name.trim().toLowerCase());
+              if (matchedIdx >= 0) {
+                const em = editingParticipant.members[matchedIdx];
+                return {
+                  ...m,
+                  userId: em.userId,
+                  userEmail: em.userEmail,
+                  phone: em.phone || m.phone,
+                  bankDetails: em.bankDetails || m.bankDetails
+                };
+              }
+              return m;
+            });
+            return { ...p, members: updatedMembers };
+          } else {
+            const firstMember = p.members[0];
+            const isMatch = targetNames.includes(firstMember.name.trim().toLowerCase());
+            if (isMatch) {
+              const em = editingParticipant.members[0];
+              const updatedMember = {
+                ...firstMember,
+                userId: em.userId,
+                userEmail: em.userEmail,
+                phone: em.phone || firstMember.phone,
+                bankDetails: em.bankDetails || firstMember.bankDetails
+              };
+              return {
+                ...p,
+                userId: em.userId,
+                userEmail: em.userEmail,
+                members: [updatedMember, ...p.members.slice(1)]
+              };
+            }
+            return p;
+          }
+        });
+
+        onUpdateAllParticipants(updatedAll);
+      } else {
+        onUpdateParticipant(editingParticipant);
+      }
       setEditDialogOpen(false);
       setEditingParticipant(null);
+      setUserSearchFeedback("");
+      setUserSearchEmail("");
     }
   };
 
@@ -206,7 +283,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
     }
   };
 
-  const updateEditMember = (index: number, field: 'name' | 'phone' | 'bankDetails', value: string) => {
+  const updateEditMember = (index: number, field: string, value: any) => {
     if (editingParticipant) {
       const newMembers = [...editingParticipant.members];
       newMembers[index] = { ...newMembers[index], [field]: value };
@@ -915,10 +992,119 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   InputProps={{
                     startAdornment: <InputAdornment position="start" sx={{ mt: 0.5 }}><BankIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment>,
                   }}
+                  inputProps={{ style: { fontSize: '16px' } }}
                 />
+
+                {/* Sección de Cuenta de Usuario vinculada */}
+                {m.userId || m.userEmail ? (
+                  <Box sx={{ p: 1.25, bgcolor: 'surface.paid', borderRadius: 2, border: 1, borderColor: 'secondary.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CheckCircleIcon sx={{ fontSize: 18, color: 'secondary.main' }} />
+                      <Box>
+                        <Typography variant="caption" sx={{ fontWeight: 800, color: 'secondary.main', display: 'block', fontSize: '0.65rem' }}>
+                          CUENTA DE GOOGLE VINCULADA
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.82rem', color: 'text.primary' }}>
+                          {m.userEmail || `UID: ${m.userId?.slice(0, 8)}...`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        updateEditMember(i, 'userId', undefined);
+                        updateEditMember(i, 'userEmail', undefined);
+                      }}
+                      sx={{ fontWeight: 700, fontSize: '0.72rem' }}
+                    >
+                      Desvincular
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box sx={{ p: 1.25, bgcolor: 'surface.muted', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, fontSize: '0.68rem', display: 'block', mb: 0.5 }}>
+                      VINCULAR CUENTA DE GOOGLE
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <TextField
+                        placeholder="Email (ej: pedro@gmail.com)"
+                        fullWidth
+                        size="small"
+                        value={userSearchEmail}
+                        onChange={(e) => {
+                          setUserSearchEmail(e.target.value);
+                          setUserSearchFeedback("");
+                        }}
+                        inputProps={{ style: { fontSize: '16px' } }}
+                      />
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={!userSearchEmail.trim() || userSearching}
+                        onClick={async () => {
+                          setUserSearching(true);
+                          setUserSearchFeedback("");
+                          const profile = await UserService.findUserByEmail(userSearchEmail);
+                          setUserSearching(false);
+                          if (profile) {
+                            updateEditMember(i, 'userId', profile.uid);
+                            updateEditMember(i, 'userEmail', profile.email);
+                            if (profile.bankDetails && !m.bankDetails) {
+                              updateEditMember(i, 'bankDetails', profile.bankDetails);
+                            }
+                            if (profile.phone && !m.phone) {
+                              updateEditMember(i, 'phone', profile.phone);
+                            }
+                            setUserSearchFeedback(`✅ Usuario asociado: ${profile.displayName}`);
+                            setUserSearchEmail("");
+                          } else {
+                            setUserSearchFeedback("No se encontró usuario registrado con ese email.");
+                          }
+                        }}
+                        sx={{ fontWeight: 700, minHeight: 38, whiteSpace: 'nowrap', borderRadius: 1.5, borderColor: 'divider' }}
+                      >
+                        {userSearching ? "..." : "Asociar"}
+                      </Button>
+                    </Stack>
+                    {userSearchFeedback && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 700, color: userSearchFeedback.startsWith('✅') ? 'secondary.main' : 'error.main' }}>
+                        {userSearchFeedback}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
                 {i === 0 && editingParticipant.type === 'shared' && <Divider sx={{ my: 0.5 }} />}
               </Stack>
             ))}
+
+            {/* Aviso de Números Repetidos */}
+            {relatedTurnNumbers.length > 0 && (
+              <Box sx={{ p: 1.5, bgcolor: 'surface.paid', borderRadius: 2, border: 1, borderColor: 'secondary.main' }}>
+                <Typography variant="caption" sx={{ fontWeight: 900, color: 'secondary.main', display: 'block' }}>
+                  💡 ESTE INTEGRANTE TIENE MÁS DE UN NÚMERO
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, mt: 0.25, color: 'text.primary' }}>
+                  {editingParticipant?.members[0]?.name} también participa en el Turno #{relatedTurnNumbers.join(', #')}.
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={syncAllMatchingTurns}
+                      onChange={(e) => setSyncAllMatchingTurns(e.target.checked)}
+                      color="secondary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.82rem', color: 'text.primary' }}>
+                      Asignar esta cuenta y datos bancarios a todos sus números
+                    </Typography>
+                  }
+                  sx={{ mt: 0.5, display: 'block' }}
+                />
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

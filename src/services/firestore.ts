@@ -203,14 +203,16 @@ export const PollaService = {
   },
 
   /**
-   * Vincula un usuario autenticado a una casilla de participante en una Polla
+   * Vincula un usuario autenticado a una casilla de participante en una Polla,
+   * y automáticamente a todos los turnos del mismo integrante si linkAllMatching = true
    */
   linkUserToParticipant: async (
     pollaId: string, 
     participantId: string, 
-    user: { uid: string; email: string; name?: string; bankDetails?: string },
-    memberIndex?: number
-  ): Promise<void> => {
+    user: { uid: string; email: string; name?: string; phone?: string; bankDetails?: string },
+    memberIndex?: number,
+    linkAllMatching = true
+  ): Promise<{ linkedTurns: number[] }> => {
     try {
       const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
       const snap = await getDoc(pollaRef);
@@ -219,16 +221,34 @@ export const PollaService = {
       const data = snap.data();
       const participants: Participant[] = data.participants || [];
 
-      const updatedParticipants = participants.map(p => {
-        if (p.id !== participantId) return p;
+      // 1. Encontrar el nombre objetivo para vincular todos sus números repetidos
+      const targetP = participants.find(p => p.id === participantId);
+      if (!targetP) throw new Error("Participante no encontrado");
 
-        if (p.type === 'shared' && typeof memberIndex === 'number') {
+      const targetName = (
+        typeof memberIndex === 'number'
+          ? targetP.members[memberIndex]?.name
+          : targetP.members[0]?.name
+      )?.trim().toLowerCase() || "";
+
+      const linkedTurns: number[] = [];
+
+      // 2. Mapear y asignar a este turno y a todos los que tengan el mismo nombre
+      const updatedParticipants = participants.map(p => {
+        const isExactTarget = p.id === participantId;
+
+        if (p.type === 'shared') {
           const updatedMembers = p.members.map((m, idx) => {
-            if (idx === memberIndex) {
+            const isMatch = (isExactTarget && idx === memberIndex) ||
+              (linkAllMatching && targetName && m.name.trim().toLowerCase() === targetName);
+
+            if (isMatch) {
+              if (!linkedTurns.includes(p.turnNumber)) linkedTurns.push(p.turnNumber);
               return {
                 ...m,
                 userId: user.uid,
                 userEmail: user.email,
+                phone: m.phone || user.phone || "",
                 bankDetails: m.bankDetails || user.bankDetails
               };
             }
@@ -237,18 +257,26 @@ export const PollaService = {
           return { ...p, members: updatedMembers };
         } else {
           const firstMember = p.members?.[0] || { name: user.name || 'Participante', phone: '', paymentHistory: {} };
-          const updatedMember = {
-            ...firstMember,
-            userId: user.uid,
-            userEmail: user.email,
-            bankDetails: firstMember.bankDetails || user.bankDetails
-          };
-          return {
-            ...p,
-            userId: user.uid,
-            userEmail: user.email,
-            members: [updatedMember, ...p.members.slice(1)]
-          };
+          const isMatch = isExactTarget ||
+            (linkAllMatching && targetName && firstMember.name.trim().toLowerCase() === targetName);
+
+          if (isMatch) {
+            if (!linkedTurns.includes(p.turnNumber)) linkedTurns.push(p.turnNumber);
+            const updatedMember = {
+              ...firstMember,
+              userId: user.uid,
+              userEmail: user.email,
+              phone: firstMember.phone || user.phone || "",
+              bankDetails: firstMember.bankDetails || user.bankDetails
+            };
+            return {
+              ...p,
+              userId: user.uid,
+              userEmail: user.email,
+              members: [updatedMember, ...p.members.slice(1)]
+            };
+          }
+          return p;
         }
       });
 
@@ -259,6 +287,8 @@ export const PollaService = {
         participantUserIds: participantUserIds,
         updatedAt: Timestamp.now()
       });
+
+      return { linkedTurns: linkedTurns.sort((a, b) => a - b) };
     } catch (error) {
       console.error("Error vinculando usuario a participante:", error);
       throw error;
@@ -526,5 +556,36 @@ export const UserService = {
         callback(null);
       }
     });
+  },
+
+  /**
+   * Busca un usuario por su correo electrónico
+   */
+  findUserByEmail: async (email: string): Promise<UserProfile | null> => {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const q = query(collection(db, USERS_COLLECTION), where("email", "==", cleanEmail));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs[0].data() as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error buscando usuario por email:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Obtiene la lista de usuarios registrados para autocompletado del admin
+   */
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    try {
+      const snap = await getDocs(collection(db, USERS_COLLECTION));
+      return snap.docs.map(d => d.data() as UserProfile);
+    } catch (error) {
+      console.error("Error listando usuarios:", error);
+      return [];
+    }
   }
 };

@@ -481,38 +481,50 @@ const ListView: React.FC<ListViewProps> = ({
               const recipientName = recipient ? getParticipantName(recipient) : "Sin asignar";
               const recipientBank = recipient?.members?.find(m => m.bankDetails)?.bankDetails || recipient?.members?.[0]?.bankDetails || "";
 
-              // Buscar el participante correspondiente al usuario actual
-              const myParticipant = group.participants.find(p => 
+              // Buscar todos los turnos del usuario actual en esta polla (Soporte Multi-Turno)
+              const myParticipants = group.participants.filter(p => 
                 p.userId === currentUser?.uid || 
                 p.members?.some(m => m.userId === currentUser?.uid)
               );
 
-              // Estado de pago del usuario en el turno actual
+              const myTurnNumbers = myParticipants.map(p => p.turnNumber).sort((a, b) => a - b);
+              const isMyTurnToReceive = myTurnNumbers.includes(currentTurn);
+
+              const myParticipant = myParticipants[0];
               let isMyTurnPaid = false;
-              let isMyTurnToReceive = false;
-              let myTurnNumber = 0;
               let myMemberIndex: number | undefined = undefined;
               let myMemberName = "";
               let myReceipt: any = null;
               let myQuota = group.settings.quotaAmount;
 
-              if (myParticipant) {
-                myTurnNumber = myParticipant.turnNumber;
-                isMyTurnToReceive = myTurnNumber === currentTurn;
+              if (myParticipants.length > 0) {
+                // Sumar cuotas totales de todos los números que tenga el usuario
+                myQuota = myParticipants.reduce((acc, p) => {
+                  if (p.type === 'shared') {
+                    const mCount = p.members.length || 2;
+                    return acc + Math.floor(group.settings.quotaAmount / mCount);
+                  }
+                  return acc + group.settings.quotaAmount;
+                }, 0);
+
+                // ¿Están pagados todos sus turnos en este turno actual?
+                isMyTurnPaid = myParticipants.every(p => {
+                  if (p.type === 'shared') {
+                    const m = p.members.find(mem => mem.userId === currentUser?.uid);
+                    return m?.paymentHistory?.[currentTurn] || false;
+                  }
+                  return p.paymentHistory?.[currentTurn] || false;
+                });
 
                 if (myParticipant.type === 'shared') {
                   const mIdx = myParticipant.members.findIndex(m => m.userId === currentUser?.uid);
                   if (mIdx >= 0) {
                     myMemberIndex = mIdx;
-                    const m = myParticipant.members[mIdx];
-                    myMemberName = m.name;
-                    isMyTurnPaid = m.paymentHistory?.[currentTurn] || false;
-                    myReceipt = m.paymentReceipts?.[currentTurn];
+                    myMemberName = myParticipant.members[mIdx].name;
+                    myReceipt = myParticipant.members[mIdx].paymentReceipts?.[currentTurn];
                   }
-                  myQuota = Math.floor(group.settings.quotaAmount / (myParticipant.members.length || 2));
                 } else {
                   myMemberName = myParticipant.members[0]?.name || "Participante";
-                  isMyTurnPaid = myParticipant.paymentHistory?.[currentTurn] || false;
                   myReceipt = myParticipant.paymentReceipts?.[currentTurn];
                 }
               }
@@ -739,9 +751,9 @@ const ListView: React.FC<ListViewProps> = ({
                   {/* Resumen de tu participación */}
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={1}>
-                      {myTurnNumber > 0 && (
+                      {myTurnNumbers.length > 0 && (
                         <Chip 
-                          label={`Tu turno: #${myTurnNumber}`} 
+                          label={myTurnNumbers.length > 1 ? `Tus turnos: #${myTurnNumbers.join(', #')}` : `Tu turno: #${myTurnNumbers[0]}`} 
                           size="small" 
                           sx={{ 
                             height: 22, 
@@ -753,7 +765,7 @@ const ListView: React.FC<ListViewProps> = ({
                         />
                       )}
                       <Chip 
-                        label={`Cuota: ${formatCurrency(group.settings.quotaAmount)}`} 
+                        label={`Cuota: ${formatCurrency(myQuota)}`} 
                         size="small" 
                         sx={{ 
                           height: 22, 
