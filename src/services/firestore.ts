@@ -2,6 +2,7 @@ import {
   collection, 
   doc, 
   setDoc, 
+  getDoc,
   getDocs, 
   updateDoc, 
   deleteDoc, 
@@ -12,10 +13,25 @@ import {
   addDoc
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { PollaGroup, AppSettings, Participant } from "../types";
+import { PollaGroup, AppSettings, Participant, UserProfile } from "../types";
 
-// Nombre de la colección en Firestore
+// Colecciones en Firestore
 const POLLAS_COLLECTION = "pollas";
+const USERS_COLLECTION = "users";
+
+/**
+ * Extrae todos los UIDs de usuarios vinculados a los participantes de una polla
+ */
+export const extractParticipantUserIds = (participants: Participant[]): string[] => {
+  const uids = new Set<string>();
+  (participants || []).forEach(p => {
+    if (p.userId) uids.add(p.userId);
+    (p.members || []).forEach(m => {
+      if (m.userId) uids.add(m.userId);
+    });
+  });
+  return Array.from(uids);
+};
 
 /**
  * Servicio para gestionar las Pollas en Firestore
@@ -26,7 +42,6 @@ export const PollaService = {
    * Crea una nueva Polla asociada a un usuario
    */
   createPolla: async (userId: string, groupName: string): Promise<string> => {
-    // Configuración inicial por defecto
     const defaultSettings: AppSettings = {
       groupName: groupName,
       quotaAmount: 0,
@@ -40,6 +55,7 @@ export const PollaService = {
 
     const newPollaData = {
       adminId: userId,
+      participantUserIds: [] as string[],
       settings: defaultSettings,
       participants: [] as Participant[],
       createdAt: Timestamp.now(), 
@@ -62,8 +78,11 @@ export const PollaService = {
   savePolla: async (userId: string, polla: PollaGroup): Promise<void> => {
     try {
       const pollaRef = doc(db, POLLAS_COLLECTION, polla.id);
+      const participantUserIds = extractParticipantUserIds(polla.participants);
+
       await setDoc(pollaRef, {
-        adminId: userId, // Aseguramos que el usuario siga siendo el dueño
+        adminId: userId,
+        participantUserIds,
         settings: polla.settings,
         participants: polla.participants,
         updatedAt: Timestamp.now()
@@ -91,13 +110,16 @@ export const PollaService = {
   },
 
   /**
-   * Actualiza la lista de participantes (y sus estados de pago)
+   * Actualiza la lista de participantes (y sincroniza participantUserIds)
    */
   updateParticipants: async (pollaId: string, participants: Participant[]): Promise<void> => {
     try {
       const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const participantUserIds = extractParticipantUserIds(participants);
+
       await updateDoc(pollaRef, {
         participants: participants,
+        participantUserIds: participantUserIds,
         updatedAt: Timestamp.now()
       });
     } catch (error) {
@@ -107,10 +129,30 @@ export const PollaService = {
   },
 
   /**
-   * Suscribe a las Pollas de un usuario en tiempo real
-   * @param userId ID del usuario autenticado
-   * @param callback Función que recibe la lista de pollas actualizada
-   * @returns Función para desuscribirse (unsubscribe)
+   * Obtiene una Polla por su ID
+   */
+  getPollaById: async (pollaId: string): Promise<PollaGroup | null> => {
+    try {
+      const docRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      return {
+        id: snap.id,
+        adminId: data.adminId || data.userId,
+        participantUserIds: data.participantUserIds || [],
+        settings: data.settings as AppSettings,
+        participants: (data.participants || []) as Participant[],
+        createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now(),
+      };
+    } catch (error) {
+      console.error("Error obteniendo polla por ID:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Suscribe a las Pollas que un usuario ADMINISTRA (adminId == userId)
    */
   subscribeToUserPollas: (userId: string, callback: (pollas: PollaGroup[]) => void) => {
     const q = query(collection(db, POLLAS_COLLECTION), where("adminId", "==", userId));
@@ -121,15 +163,106 @@ export const PollaService = {
         const data = doc.data();
         pollas.push({
           id: doc.id,
+          adminId: data.adminId,
+          participantUserIds: data.participantUserIds || [],
           settings: data.settings as AppSettings,
           participants: (data.participants || []) as Participant[],
-          createdAt: data.createdAt?.toMillis() || Date.now(),
+          createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now(),
         });
       });
-      // Ordenar por fecha de creación (opcional)
       pollas.sort((a, b) => b.createdAt - a.createdAt);
       callback(pollas);
     });
+  },
+
+  /**
+   * Suscribe a las Pollas donde el usuario PARTICIPA (participantUserIds array-contains userId)
+   */
+  subscribeToParticipantPollas: (userId: string, callback: (pollas: PollaGroup[]) => void) => {
+    const q = query(collection(db, POLLAS_COLLECTION), where("participantUserIds", "array-contains", userId));
+    
+    return onSnapshot(q, (snapshot) => {
+      const pollas: PollaGroup[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        // Evitar duplicar si también es el admin
+        if (data.adminId !== userId) {
+          pollas.push({
+            id: doc.id,
+            adminId: data.adminId,
+            participantUserIds: data.participantUserIds || [],
+            settings: data.settings as AppSettings,
+            participants: (data.participants || []) as Participant[],
+            createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now(),
+          });
+        }
+      });
+      pollas.sort((a, b) => b.createdAt - a.createdAt);
+      callback(pollas);
+    });
+  },
+
+  /**
+   * Vincula un usuario autenticado a una casilla de participante en una Polla
+   */
+  linkUserToParticipant: async (
+    pollaId: string, 
+    participantId: string, 
+    user: { uid: string; email: string; name?: string; bankDetails?: string },
+    memberIndex?: number
+  ): Promise<void> => {
+    try {
+      const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const snap = await getDoc(pollaRef);
+      if (!snap.exists()) throw new Error("Polla no encontrada");
+
+      const data = snap.data();
+      const participants: Participant[] = data.participants || [];
+
+      const updatedParticipants = participants.map(p => {
+        if (p.id !== participantId) return p;
+
+        if (p.type === 'shared' && typeof memberIndex === 'number') {
+          const updatedMembers = p.members.map((m, idx) => {
+            if (idx === memberIndex) {
+              return {
+                ...m,
+                userId: user.uid,
+                userEmail: user.email,
+                bankDetails: m.bankDetails || user.bankDetails
+              };
+            }
+            return m;
+          });
+          return { ...p, members: updatedMembers };
+        } else {
+          const firstMember = p.members?.[0] || { name: user.name || 'Participante', phone: '', paymentHistory: {} };
+          const updatedMember = {
+            ...firstMember,
+            userId: user.uid,
+            userEmail: user.email,
+            bankDetails: firstMember.bankDetails || user.bankDetails
+          };
+          return {
+            ...p,
+            userId: user.uid,
+            userEmail: user.email,
+            members: [updatedMember, ...p.members.slice(1)]
+          };
+        }
+      });
+
+      const participantUserIds = extractParticipantUserIds(updatedParticipants);
+
+      await updateDoc(pollaRef, {
+        participants: updatedParticipants,
+        participantUserIds: participantUserIds,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error("Error vinculando usuario a participante:", error);
+      throw error;
+    }
   },
 
   /**
@@ -142,5 +275,48 @@ export const PollaService = {
       console.error("Error eliminando polla:", error);
       throw error;
     }
+  }
+};
+
+/**
+ * Servicio para Perfiles de Usuario (Datos Bancarios, Teléfono, FCM)
+ */
+export const UserService = {
+  getUserProfile: async (uid: string): Promise<UserProfile | null> => {
+    try {
+      const userRef = doc(db, USERS_COLLECTION, uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        return snap.data() as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error obteniendo perfil de usuario:", error);
+      return null;
+    }
+  },
+
+  saveUserProfile: async (profile: Partial<UserProfile> & { uid: string }): Promise<void> => {
+    try {
+      const userRef = doc(db, USERS_COLLECTION, profile.uid);
+      await setDoc(userRef, {
+        ...profile,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error("Error guardando perfil de usuario:", error);
+      throw error;
+    }
+  },
+
+  subscribeToUserProfile: (uid: string, callback: (profile: UserProfile | null) => void) => {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    return onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        callback(snap.data() as UserProfile);
+      } else {
+        callback(null);
+      }
+    });
   }
 };

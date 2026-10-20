@@ -66,6 +66,7 @@ interface TurnsViewProps {
   onBulkImport: (participants: Participant[]) => void;
   onUpdateSettings: (s: AppSettings) => void;
   onSetTurnByDate: (pid: string, newTurn: number) => void;
+  isAdmin?: boolean;
 }
 
 const TurnsView: React.FC<TurnsViewProps> = ({ 
@@ -78,7 +79,8 @@ const TurnsView: React.FC<TurnsViewProps> = ({
   onReorder, 
   onBulkImport,
   onUpdateSettings,
-  onSetTurnByDate
+  onSetTurnByDate,
+  isAdmin = true
 }) => {
   const [name1, setName1] = useState("");
   const [phone1, setPhone1] = useState("");
@@ -246,7 +248,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
 
   // Manejador del Drag & Drop
   const handleDragEnd = (result: DropResult) => {
-    if (!result.destination || settings.isLocked) return;
+    if (!result.destination || settings.isLocked || !isAdmin) return;
     const sourceIndex = result.source.index;
     const destIndex = result.destination.index;
     if (sourceIndex === destIndex) return;
@@ -274,33 +276,50 @@ const TurnsView: React.FC<TurnsViewProps> = ({
           />
         </Stack>
 
-        <Stack direction="row" spacing={1}>
-          <Tooltip title={settings.isLocked ? "Desbloquear orden" : "Fijar orden definitivo"}>
-            <Button 
-              size="small" 
-              variant={settings.isLocked ? "contained" : "outlined"} 
-              color={settings.isLocked ? "primary" : "inherit"}
-              onClick={toggleLock}
-              startIcon={settings.isLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
-              sx={{ 
-                borderRadius: 2, 
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                borderColor: 'divider',
-                height: 36
-              }}
-            >
-              {settings.isLocked ? "Fijado" : "Fijar"}
-            </Button>
-          </Tooltip>
+        {isAdmin && (
+          <Stack direction="row" spacing={1}>
+            <Tooltip title={settings.isLocked ? "Desbloquear orden" : "Fijar orden definitivo"}>
+              <Button 
+                size="small" 
+                variant={settings.isLocked ? "contained" : "outlined"} 
+                color={settings.isLocked ? "primary" : "inherit"}
+                onClick={toggleLock}
+                startIcon={settings.isLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
+                sx={{ 
+                  borderRadius: 2, 
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  borderColor: 'divider',
+                  height: 36
+                }}
+              >
+                {settings.isLocked ? "Fijado" : "Fijar"}
+              </Button>
+            </Tooltip>
 
-          {!settings.isLocked && (
-            <>
-              <Tooltip title={settings.currentTurn > 1 ? "No se puede mezclar iniciado el periodo" : "Mezclar orden aleatorio"}>
-                <span>
+            {!settings.isLocked && (
+              <>
+                <Tooltip title={settings.currentTurn > 1 ? "No se puede mezclar iniciado el periodo" : "Mezclar orden aleatorio"}>
+                  <span>
+                    <IconButton 
+                      onClick={onShuffle} 
+                      disabled={settings.currentTurn > 1} 
+                      sx={{ 
+                        border: 1, 
+                        borderColor: 'divider', 
+                        borderRadius: 2,
+                        width: 36,
+                        height: 36,
+                        bgcolor: 'background.paper'
+                      }}
+                    >
+                      <ShuffleIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Pegar lista de nombres">
                   <IconButton 
-                    onClick={onShuffle} 
-                    disabled={settings.currentTurn > 1} 
+                    onClick={() => setBulkOpen(true)} 
                     sx={{ 
                       border: 1, 
                       borderColor: 'divider', 
@@ -310,32 +329,17 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                       bgcolor: 'background.paper'
                     }}
                   >
-                    <ShuffleIcon fontSize="small" />
+                    <PasteIcon fontSize="small" />
                   </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Pegar lista de nombres">
-                <IconButton 
-                  onClick={() => setBulkOpen(true)} 
-                  sx={{ 
-                    border: 1, 
-                    borderColor: 'divider', 
-                    borderRadius: 2,
-                    width: 36,
-                    height: 36,
-                    bgcolor: 'background.paper'
-                  }}
-                >
-                  <PasteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-        </Stack>
+                </Tooltip>
+              </>
+            )}
+          </Stack>
+        )}
       </Stack>
 
       {/* Alerta de Orden Bloqueado */}
-      {settings.isLocked && (
+      {settings.isLocked && isAdmin && (
         <Alert 
           severity="info" 
           icon={<LockIcon fontSize="inherit" />}
@@ -355,7 +359,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
       )}
 
       {/* ─── Formulario de Agregar Integrante (Colapsable) ─── */}
-      {!settings.isLocked && (
+      {!settings.isLocked && isAdmin && (
         <Box sx={{ mb: 2 }}>
           {!isAddFormOpen ? (
             <Button
@@ -567,7 +571,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                   const isPast = p.turnNumber < settings.currentTurn;
                   const isCurrent = p.turnNumber === settings.currentTurn;
                   const hasDivider = idx < sortedParticipants.length - 1;
-                  const isDragDisabled = settings.isLocked || isPast;
+                  const isDragDisabled = !isAdmin || settings.isLocked || isPast;
 
                   return (
                     <Draggable 
@@ -604,7 +608,7 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                           }}
                         >
                           {/* Manija de Arrastre (Drag Handle) */}
-                          {!settings.isLocked && !isPast && (
+                          {!settings.isLocked && !isPast && isAdmin && (
                             <Box 
                               {...draggableProvided.dragHandleProps} 
                               sx={{ 
@@ -718,35 +722,37 @@ const TurnsView: React.FC<TurnsViewProps> = ({
                           </Box>
 
                           {/* Acciones de Respaldo (Flechas) y Menú */}
-                          <Stack direction="row" spacing={0.25} alignItems="center">
-                            {!settings.isLocked && !isPast && (
-                              <Stack direction="row">
-                                <IconButton 
-                                  size="small" 
-                                  disabled={idx === 0 || p.turnNumber <= settings.currentTurn} 
-                                  onClick={() => onReorder(idx, idx - 1)} 
-                                  sx={{ p: 0.25, '&:disabled': { opacity: 0.15 } }}
-                                >
-                                  <UpIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton 
-                                  size="small" 
-                                  disabled={idx === participants.length - 1 || p.turnNumber < settings.currentTurn} 
-                                  onClick={() => onReorder(idx, idx + 1)} 
-                                  sx={{ p: 0.25, '&:disabled': { opacity: 0.15 } }}
-                                >
-                                  <DownIcon fontSize="small" />
-                                </IconButton>
-                              </Stack>
-                            )}
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => handleOpenMenu(e, p.id)} 
-                              sx={{ color: 'text.secondary', p: 0.75 }}
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
-                          </Stack>
+                          {isAdmin && (
+                            <Stack direction="row" spacing={0.25} alignItems="center">
+                              {!settings.isLocked && !isPast && (
+                                <Stack direction="row">
+                                  <IconButton 
+                                    size="small" 
+                                    disabled={idx === 0 || p.turnNumber <= settings.currentTurn} 
+                                    onClick={() => onReorder(idx, idx - 1)} 
+                                    sx={{ p: 0.25, '&:disabled': { opacity: 0.15 } }}
+                                  >
+                                    <UpIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton 
+                                    size="small" 
+                                    disabled={idx === participants.length - 1 || p.turnNumber < settings.currentTurn} 
+                                    onClick={() => onReorder(idx, idx + 1)} 
+                                    sx={{ p: 0.25, '&:disabled': { opacity: 0.15 } }}
+                                  >
+                                    <DownIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              )}
+                              <IconButton 
+                                size="small" 
+                                onClick={(e) => handleOpenMenu(e, p.id)} 
+                                sx={{ color: 'text.secondary', p: 0.75 }}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          )}
                         </Box>
                       )}
                     </Draggable>

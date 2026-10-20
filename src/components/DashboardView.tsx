@@ -57,6 +57,7 @@ interface DashboardViewProps {
   settings: AppSettings;
   onTogglePayment: (id: string, memberIndex?: number) => void;
   onBatchTogglePayment?: (updates: { pid: string, memberIndex?: number }[]) => void;
+  isAdmin?: boolean;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({ 
@@ -64,7 +65,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   participants, 
   settings, 
   onTogglePayment, 
-  onBatchTogglePayment 
+  onBatchTogglePayment,
+  isAdmin = true
 }) => {
   const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, pid: string, memberIndex?: number }>({ 
     open: false, 
@@ -194,6 +196,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
   }, [participants, settings, stats, groupId]);
 
   const onIntentToggle = (p: Participant, memberIndex?: number) => {
+    if (!isAdmin) return;
     const targetIsPaid = (p.type === 'shared' && memberIndex !== undefined)
       ? isSharedMemberPaid(p, memberIndex, settings.currentTurn)
       : isParticipantPaid(p, settings.currentTurn);
@@ -628,23 +631,25 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
               sx={{ bgcolor: 'surface.muted', fontWeight: 800, fontSize: '0.72rem', height: 22, borderRadius: 1.5 }} 
             />
           </Stack>
-          <Button 
-            size="small" 
-            variant={isMarkingMode ? "contained" : "outlined"} 
-            color={isMarkingMode ? "secondary" : "inherit"}
-            startIcon={isMarkingMode ? <DoneAllIcon /> : <EditIcon />}
-            onClick={() => setIsMarkingMode(!isMarkingMode)}
-            sx={{ 
-              borderRadius: 2, 
-              px: 1.5, 
-              height: 34, 
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              borderColor: 'divider'
-            }}
-          >
-            {isMarkingMode ? "Listo" : "Marcar rápido"}
-          </Button>
+          {isAdmin && (
+            <Button 
+              size="small" 
+              variant={isMarkingMode ? "contained" : "outlined"} 
+              color={isMarkingMode ? "secondary" : "inherit"}
+              startIcon={isMarkingMode ? <DoneAllIcon /> : <EditIcon />}
+              onClick={() => setIsMarkingMode(!isMarkingMode)}
+              sx={{ 
+                borderRadius: 2, 
+                px: 1.5, 
+                height: 34, 
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                borderColor: 'divider'
+              }}
+            >
+              {isMarkingMode ? "Listo" : "Marcar rápido"}
+            </Button>
+          )}
         </Stack>
 
         {/* Buscador */}
@@ -701,7 +706,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                       display: 'flex',
                       alignItems: 'center',
                       gap: 1.5,
-                      cursor: 'pointer',
+                      cursor: isAdmin ? 'pointer' : 'default',
                       bgcolor: isPaid ? 'surface.paid' : 'transparent',
                       transition: 'background-color 0.15s ease',
                       '&:hover': {
@@ -875,7 +880,7 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                                 bgcolor: isMemberPaid ? 'surface.paid' : 'surface.muted',
                                 border: 1,
                                 borderColor: isMemberPaid ? 'success.main' : 'divider',
-                                cursor: 'pointer',
+                                cursor: isAdmin ? 'pointer' : 'default',
                                 transition: 'all 0.15s ease',
                                 '&:hover': {
                                   borderColor: 'secondary.main',

@@ -6,24 +6,37 @@ service cloud.firestore {
     match /pollas/{pollaId} {
       
       // LECTURA PÚBLICA:
-      // Permitimos que cualquiera con el ID (Link) pueda ver los datos básicos.
-      // Esto es necesario para la vista de invitados 'PublicTurnsView'.
+      // Permite que cualquiera con el ID (Link) pueda ver el calendario y turnos básicos.
       allow read: if true;
 
       // CREAR:
-      // 1. El usuario debe estar autenticado.
-      // 2. El campo 'adminId' del nuevo documento debe coincidir con su UID.
+      // El usuario debe estar autenticado y ser el adminId del documento.
       allow create: if request.auth != null 
                     && request.resource.data.adminId == request.auth.uid;
 
-      // ACTUALIZAR Y BORRAR:
-      // 1. El usuario debe estar autenticado.
-      // 2. El usuario debe ser el propietario del documento existente (adminId coincide).
-      allow update, delete: if request.auth != null 
-                            && resource.data.adminId == request.auth.uid;
+      // ACTUALIZAR:
+      // 1. El administrador de la polla.
+      // 2. O un participante registrado (para vincular su cuenta o subir comprobantes).
+      allow update: if request.auth != null && (
+        resource.data.adminId == request.auth.uid ||
+        (resource.data.participantUserIds != null && request.auth.uid in resource.data.participantUserIds) ||
+        (request.resource.data.participantUserIds != null && request.auth.uid in request.resource.data.participantUserIds)
+      );
+
+      // BORRAR: Solo el creador / administrador
+      allow delete: if request.auth != null 
+                    && resource.data.adminId == request.auth.uid;
     }
     
-    // Bloquear acceso a cualquier otra colección no definida explícitamente
+    // Reglas para la colección 'users' (perfil, datos de transferencia)
+    match /users/{userId} {
+      // Lectura permitida a usuarios autenticados (para obtener datos bancarios del beneficiario)
+      allow read: if request.auth != null;
+      // Escritura restringida al propio dueño del perfil
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Bloquear cualquier otra colección no autorizada
     match /{document=**} {
       allow read, write: if false;
     }

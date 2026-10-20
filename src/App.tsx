@@ -10,7 +10,8 @@ import {
 import {
   Dashboard as DashboardIcon,
   CalendarMonth as CalendarIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  ArrowBack as ArrowBackIcon
 } from "@mui/icons-material";
 
 import { AppSettings, PollaGroup, Participant } from "@/types";
@@ -30,7 +31,8 @@ const App = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [view, setView] = useState(0); 
-  const [groups, setGroups] = useState<PollaGroup[]>([]);
+  const [adminGroups, setAdminGroups] = useState<PollaGroup[]>([]);
+  const [participantGroups, setParticipantGroups] = useState<PollaGroup[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 
   // === EFECTOS ===
@@ -51,22 +53,40 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  // Cargar grupos desde Firestore cuando el usuario se loguea
+  // Cargar grupos desde Firestore cuando el usuario se loguea (Doble Rol: Admin y Participante)
   useEffect(() => {
     if (user) {
       setIsLoadingGroups(true);
-      const unsubscribeGroups = PollaService.subscribeToUserPollas(user.uid, (fetchedGroups) => {
-        setGroups(fetchedGroups);
+      const unsubscribeAdmin = PollaService.subscribeToUserPollas(user.uid, (fetchedAdmin) => {
+        setAdminGroups(fetchedAdmin);
         setIsLoadingGroups(false);
       });
-      return () => unsubscribeGroups();
+
+      const unsubscribeParticipant = PollaService.subscribeToParticipantPollas(user.uid, (fetchedParticipant) => {
+        setParticipantGroups(fetchedParticipant);
+      });
+
+      return () => {
+        unsubscribeAdmin();
+        unsubscribeParticipant();
+      };
     } else {
-      setGroups([]);
+      setAdminGroups([]);
+      setParticipantGroups([]);
     }
   }, [user]);
 
-  // === CALCULOS ===
-  const activeGroup = useMemo(() => groups.find(g => g.id === activeGroupId), [groups, activeGroupId]);
+  // Lista unificada para resolución de grupo activo
+  const allGroups = useMemo(() => {
+    const map = new Map<string, PollaGroup>();
+    adminGroups.forEach(g => map.set(g.id, g));
+    participantGroups.forEach(g => map.set(g.id, g));
+    return Array.from(map.values());
+  }, [adminGroups, participantGroups]);
+
+  // === CÁLCULOS ===
+  const activeGroup = useMemo(() => allGroups.find(g => g.id === activeGroupId), [allGroups, activeGroupId]);
+  const isAdmin = useMemo(() => Boolean(activeGroup && user && activeGroup.adminId === user.uid), [activeGroup, user]);
 
   // Flag derivado: ¿el turno actual está 100% pagado?
   const isCurrentTurnFullyPaid = useMemo(() => {
@@ -80,9 +100,9 @@ const App = () => {
     });
   }, [activeGroup?.participants, activeGroup?.settings.currentTurn]);
 
-  // AUTO-CRON: Verificar turno AL ENTRAR al grupo o cuando se paguen todos los turnos
+  // AUTO-CRON: Verificar turno AL ENTRAR al grupo o cuando se paguen todos los turnos (Solo Admin)
   useEffect(() => {
-    if (activeGroup?.settings?.startDate) {
+    if (isAdmin && activeGroup?.settings?.startDate) {
       const realTurn = calculateCurrentTurnFromDate(activeGroup.settings);
       const currentTurn = activeGroup.settings.currentTurn;
 
@@ -110,7 +130,7 @@ const App = () => {
         }
       }
     }
-  }, [activeGroup?.id, isCurrentTurnFullyPaid]);
+  }, [isAdmin, activeGroup?.id, isCurrentTurnFullyPaid]);
 
   // === HANDLERS FIREBASE ===
   
@@ -137,7 +157,7 @@ const App = () => {
   };
 
   const updateActiveGroupParticipants = async (newParticipants: Participant[]) => {
-    if (!activeGroupId) return;
+    if (!activeGroupId || !isAdmin) return;
     try {
       await PollaService.updateParticipants(activeGroupId, newParticipants);
     } catch (e) {
@@ -146,7 +166,7 @@ const App = () => {
   };
   
   const updateActiveGroupSettings = async (newSettings: AppSettings) => {
-    if (!activeGroupId) return;
+    if (!activeGroupId || !isAdmin) return;
     try {
       await PollaService.updateSettings(activeGroupId, newSettings);
     } catch (e) {
@@ -157,7 +177,7 @@ const App = () => {
   // === LÓGICA DE NEGOCIO LOCAL ===
 
   const handleSetTurnByDate = (pid: string, newTurn: number) => {
-    if (!activeGroup) return;
+    if (!activeGroup || !isAdmin) return;
     const sorted = [...activeGroup.participants].sort((a, b) => a.turnNumber - b.turnNumber);
     const targetIdx = sorted.findIndex(p => p.id === pid);
     if (targetIdx === -1) return;
@@ -203,7 +223,7 @@ const App = () => {
   };
 
   const handleTogglePayment = (pid: string, memberIndex?: number) => {
-    if (!activeGroup) return;
+    if (!activeGroup || !isAdmin) return;
     const currentTurn = activeGroup.settings.currentTurn;
     const updatedParticipants = activeGroup.participants.map(p => {
       if (p.id !== pid) return p;
@@ -213,7 +233,7 @@ const App = () => {
   };
 
   const handleBatchTogglePayment = (updates: { pid: string, memberIndex?: number }[]) => {
-    if (!activeGroup) return;
+    if (!activeGroup || !isAdmin) return;
     const currentTurn = activeGroup.settings.currentTurn;
     let nextParticipants = [...activeGroup.participants];
     
@@ -240,7 +260,7 @@ const App = () => {
     return <LoginView onLogin={loginWithGoogle} />;
   }
 
-  if (isLoadingGroups && groups.length === 0) {
+  if (isLoadingGroups && adminGroups.length === 0 && participantGroups.length === 0) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
         <Typography variant="body2" color="text.secondary">Cargando tus pollas...</Typography>
@@ -252,11 +272,13 @@ const App = () => {
   if (!activeGroupId || !activeGroup) {
     return (
       <ListView 
-        groups={groups} 
+        groups={adminGroups} 
+        participantGroups={participantGroups}
         onSelect={setActiveGroupId} 
         onCreate={handleCreateGroup} 
         onDelete={handleDeleteGroup}
         onLogout={() => signOut(auth)} 
+        currentUser={user}
       />
     );
   }
@@ -271,6 +293,7 @@ const App = () => {
           settings={activeGroup.settings} 
           onTogglePayment={handleTogglePayment} 
           onBatchTogglePayment={handleBatchTogglePayment}
+          isAdmin={isAdmin}
         />
       )}
       {view === 1 && (
@@ -302,9 +325,10 @@ const App = () => {
             ...newParticipants.map(p => ({ ...p, paymentHistory: {} }))
           ])} 
           onSetTurnByDate={handleSetTurnByDate}
+          isAdmin={isAdmin}
         />
       )}
-      {view === 2 && (
+      {view === 2 && isAdmin && (
         <SettingsView 
           settings={activeGroup.settings} 
           onUpdate={updateActiveGroupSettings} 
@@ -328,12 +352,24 @@ const App = () => {
         <BottomNavigation 
           showLabels 
           value={view} 
-          onChange={(_, v) => setView(v)} 
+          onChange={(_, v) => {
+            if (!isAdmin && v === 2) {
+              // Si no es admin y toca "Volver a Mis Pollas"
+              setActiveGroupId(null);
+              setView(0);
+            } else {
+              setView(v);
+            }
+          }} 
           sx={{ height: 64 }}
         >
           <BottomNavigationAction label="Pagos" icon={<DashboardIcon />} />
           <BottomNavigationAction label="Turnos" icon={<CalendarIcon />} />
-          <BottomNavigationAction label="Ajustes" icon={<SettingsIcon />} />
+          {isAdmin ? (
+            <BottomNavigationAction label="Ajustes" icon={<SettingsIcon />} />
+          ) : (
+            <BottomNavigationAction label="Mis Pollas" icon={<ArrowBackIcon />} />
+          )}
         </BottomNavigation>
       </Paper>
     </Box>
