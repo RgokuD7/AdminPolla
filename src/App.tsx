@@ -294,6 +294,7 @@ const App = () => {
           onTogglePayment={handleTogglePayment} 
           onBatchTogglePayment={handleBatchTogglePayment}
           isAdmin={isAdmin}
+          currentUserId={user?.uid}
         />
       )}
       {view === 1 && (

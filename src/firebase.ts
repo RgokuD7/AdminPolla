@@ -9,6 +9,7 @@ import {
   User 
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Definir tipos para evitar errores de TS con import.meta.env
 interface ImportMetaEnv {
@@ -36,16 +37,18 @@ const firebaseConfig = {
 // Validar configuración antes de inicializar para evitar crash silencioso
 const isConfigValid = Object.values(firebaseConfig).every(value => value !== undefined && value !== '');
 
-let app;
+let app: any;
 let auth: any;
 let db: any;
+let storage: any;
 let googleProvider: any;
 
 if (isConfigValid) {
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app); // Inicializamos Firestore
+    db = getFirestore(app);
+    storage = getStorage(app);
     googleProvider = new GoogleAuthProvider();
   } catch (e) {
     console.error("🔥 Error inicializando Firebase:", e);
@@ -65,10 +68,9 @@ export const loginWithGoogle = async () => {
         await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
         console.error("Error al iniciar sesión:", error);
-        // Si el error es por popup bloqueado o cerrado por usuario, lo relanzamos para que la UI lo maneje
         throw error;
     }
 };
 
-export { auth, db, onAuthStateChanged };
+export { auth, db, storage, onAuthStateChanged };
 export type { User };

@@ -1,0 +1,17 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Reglas para comprobantes de pago de las pollas
+    match /receipts/{pollaId}/{allPaths=**} {
+      // Lectura permitida a cualquier usuario autenticado (para que admins y participantes vean los vouchers)
+      allow read: if request.auth != null;
+      
+      // Escritura permitida a usuarios autenticados:
+      // Debe ser una imagen y no superar 10MB
+      allow write: if request.auth != null 
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -266,6 +266,214 @@ export const PollaService = {
   },
 
   /**
+   * Registra el envío de un comprobante de pago para un turno
+   */
+  submitReceipt: async (
+    pollaId: string,
+    participantId: string,
+    turnNumber: number,
+    receiptUrl: string,
+    amountReported: number,
+    memberIndex?: number
+  ): Promise<void> => {
+    try {
+      const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const snap = await getDoc(pollaRef);
+      if (!snap.exists()) throw new Error("Polla no encontrada");
+
+      const data = snap.data();
+      const participants: Participant[] = data.participants || [];
+
+      const updatedParticipants = participants.map(p => {
+        if (p.id !== participantId) return p;
+
+        const newReceipt = {
+          status: 'in_review' as const,
+          receiptUrl,
+          submittedAt: Date.now(),
+          amountReported
+        };
+
+        if (p.type === 'shared' && typeof memberIndex === 'number') {
+          const updatedMembers = p.members.map((m, idx) => {
+            if (idx === memberIndex) {
+              const mReceipts = { ...(m.paymentReceipts || {}) };
+              mReceipts[turnNumber] = newReceipt;
+              return { ...m, paymentReceipts: mReceipts };
+            }
+            return m;
+          });
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          pReceipts[turnNumber] = newReceipt;
+          return { ...p, members: updatedMembers, paymentReceipts: pReceipts };
+        } else {
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          pReceipts[turnNumber] = newReceipt;
+          return { ...p, paymentReceipts: pReceipts };
+        }
+      });
+
+      await updateDoc(pollaRef, {
+        participants: updatedParticipants,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error("Error enviando comprobante:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Aprueba un comprobante de pago y marca el turno como pagado
+   */
+  approveReceipt: async (
+    pollaId: string,
+    participantId: string,
+    turnNumber: number,
+    memberIndex?: number
+  ): Promise<void> => {
+    try {
+      const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const snap = await getDoc(pollaRef);
+      if (!snap.exists()) throw new Error("Polla no encontrada");
+
+      const data = snap.data();
+      const participants: Participant[] = data.participants || [];
+
+      const updatedParticipants = participants.map(p => {
+        if (p.id !== participantId) return p;
+
+        if (p.type === 'shared' && typeof memberIndex === 'number') {
+          const updatedMembers = p.members.map((m, idx) => {
+            if (idx === memberIndex) {
+              const mHistory = { ...(m.paymentHistory || {}) };
+              mHistory[turnNumber] = true;
+              const mReceipts = { ...(m.paymentReceipts || {}) };
+              if (mReceipts[turnNumber]) {
+                mReceipts[turnNumber] = {
+                  ...mReceipts[turnNumber],
+                  status: 'confirmed',
+                  confirmedAt: Date.now()
+                };
+              }
+              return { ...m, paymentHistory: mHistory, paymentReceipts: mReceipts };
+            }
+            return m;
+          });
+
+          const allPaid = updatedMembers.every(m => m.paymentHistory?.[turnNumber]);
+          const pHistory = { ...(p.paymentHistory || {}) };
+          pHistory[turnNumber] = allPaid;
+
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          if (pReceipts[turnNumber]) {
+            pReceipts[turnNumber] = {
+              ...pReceipts[turnNumber],
+              status: 'confirmed',
+              confirmedAt: Date.now()
+            };
+          }
+
+          return { ...p, members: updatedMembers, paymentHistory: pHistory, paymentReceipts: pReceipts };
+        } else {
+          const pHistory = { ...(p.paymentHistory || {}) };
+          pHistory[turnNumber] = true;
+
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          if (pReceipts[turnNumber]) {
+            pReceipts[turnNumber] = {
+              ...pReceipts[turnNumber],
+              status: 'confirmed',
+              confirmedAt: Date.now()
+            };
+          }
+
+          return { ...p, paymentHistory: pHistory, paymentReceipts: pReceipts };
+        }
+      });
+
+      await updateDoc(pollaRef, {
+        participants: updatedParticipants,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error("Error aprobando comprobante:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Rechaza un comprobante de pago indicando el motivo
+   */
+  rejectReceipt: async (
+    pollaId: string,
+    participantId: string,
+    turnNumber: number,
+    reason: string,
+    memberIndex?: number
+  ): Promise<void> => {
+    try {
+      const pollaRef = doc(db, POLLAS_COLLECTION, pollaId);
+      const snap = await getDoc(pollaRef);
+      if (!snap.exists()) throw new Error("Polla no encontrada");
+
+      const data = snap.data();
+      const participants: Participant[] = data.participants || [];
+
+      const updatedParticipants = participants.map(p => {
+        if (p.id !== participantId) return p;
+
+        if (p.type === 'shared' && typeof memberIndex === 'number') {
+          const updatedMembers = p.members.map((m, idx) => {
+            if (idx === memberIndex) {
+              const mReceipts = { ...(m.paymentReceipts || {}) };
+              if (mReceipts[turnNumber]) {
+                mReceipts[turnNumber] = {
+                  ...mReceipts[turnNumber],
+                  status: 'rejected',
+                  rejectionReason: reason
+                };
+              }
+              return { ...m, paymentReceipts: mReceipts };
+            }
+            return m;
+          });
+
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          if (pReceipts[turnNumber]) {
+            pReceipts[turnNumber] = {
+              ...pReceipts[turnNumber],
+              status: 'rejected',
+              rejectionReason: reason
+            };
+          }
+
+          return { ...p, members: updatedMembers, paymentReceipts: pReceipts };
+        } else {
+          const pReceipts = { ...(p.paymentReceipts || {}) };
+          if (pReceipts[turnNumber]) {
+            pReceipts[turnNumber] = {
+              ...pReceipts[turnNumber],
+              status: 'rejected',
+              rejectionReason: reason
+            };
+          }
+
+          return { ...p, paymentReceipts: pReceipts };
+        }
+      });
+
+      await updateDoc(pollaRef, {
+        participants: updatedParticipants,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error("Error rechazando comprobante:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Elimina una Polla
    */
   deletePolla: async (pollaId: string): Promise<void> => {

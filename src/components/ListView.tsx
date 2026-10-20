@@ -45,13 +45,15 @@ import {
   Celebration as CelebrationIcon,
   CheckCircle as CheckCircleIcon,
   HourglassEmpty as PendingIcon,
-  OpenInNew as OpenInNewIcon
+  OpenInNew as OpenInNewIcon,
+  CloudUpload as UploadIcon
 } from "@mui/icons-material";
 import { AppSettings, Frequency, PollaGroup } from "@/types";
 import { formatCurrency, getCollectedAmount, getParticipantName, calculateCurrentTurnFromDate } from "@/utils/helpers";
 import { useThemeMode } from "@/theme/ThemeContext";
 import { AppFooter } from "./AppFooter";
 import { UserProfileDialog } from "./UserProfileDialog";
+import { UploadReceiptDialog } from "./UploadReceiptDialog";
 import { User } from "@/firebase";
 
 interface ListViewProps {
@@ -83,6 +85,17 @@ const ListView: React.FC<ListViewProps> = ({
   const [profileOpen, setProfileOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState("");
+  const [uploadModal, setUploadModal] = useState<{
+    open: boolean;
+    pollaId: string;
+    turnNumber: number;
+    participantId: string;
+    participantName: string;
+    quotaAmount: number;
+    recipientName: string;
+    recipientBankDetails?: string;
+    memberIndex?: number;
+  } | null>(null);
   const { themePreference, effectiveMode, toggleNextMode } = useThemeMode();
   
   const [form, setForm] = useState<AppSettings>({ 
@@ -478,16 +491,29 @@ const ListView: React.FC<ListViewProps> = ({
               let isMyTurnPaid = false;
               let isMyTurnToReceive = false;
               let myTurnNumber = 0;
+              let myMemberIndex: number | undefined = undefined;
+              let myMemberName = "";
+              let myReceipt: any = null;
+              let myQuota = group.settings.quotaAmount;
 
               if (myParticipant) {
                 myTurnNumber = myParticipant.turnNumber;
                 isMyTurnToReceive = myTurnNumber === currentTurn;
 
                 if (myParticipant.type === 'shared') {
-                  const myMember = myParticipant.members.find(m => m.userId === currentUser?.uid);
-                  isMyTurnPaid = myMember?.paymentHistory?.[currentTurn] || false;
+                  const mIdx = myParticipant.members.findIndex(m => m.userId === currentUser?.uid);
+                  if (mIdx >= 0) {
+                    myMemberIndex = mIdx;
+                    const m = myParticipant.members[mIdx];
+                    myMemberName = m.name;
+                    isMyTurnPaid = m.paymentHistory?.[currentTurn] || false;
+                    myReceipt = m.paymentReceipts?.[currentTurn];
+                  }
+                  myQuota = Math.floor(group.settings.quotaAmount / (myParticipant.members.length || 2));
                 } else {
+                  myMemberName = myParticipant.members[0]?.name || "Participante";
                   isMyTurnPaid = myParticipant.paymentHistory?.[currentTurn] || false;
+                  myReceipt = myParticipant.paymentReceipts?.[currentTurn];
                 }
               }
 
@@ -606,6 +632,109 @@ const ListView: React.FC<ListViewProps> = ({
                       )}
                     </Stack>
                   </Box>
+
+                  {/* Acciones de Pago y Comprobante (P2P) */}
+                  {!isMyTurnToReceive && myParticipant && (
+                    <Box sx={{ mb: 1.5 }}>
+                      {isMyTurnPaid ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1, bgcolor: 'surface.paid', borderRadius: 1.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: 'secondary.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <CheckCircleIcon sx={{ fontSize: 15 }} /> Tu cuota está confirmada
+                          </Typography>
+                          {myReceipt?.receiptUrl && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(myReceipt.receiptUrl, '_blank');
+                              }}
+                              sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'secondary.main', p: 0.25 }}
+                            >
+                              Ver comprobante
+                            </Button>
+                          )}
+                        </Box>
+                      ) : myReceipt?.status === 'in_review' ? (
+                        <Box sx={{ p: 1, bgcolor: 'surface.pending', borderRadius: 1.5, border: 1, borderColor: 'warning.main', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: 'warning.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <PendingIcon sx={{ fontSize: 14 }} /> Comprobante en revisión
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(myReceipt.receiptUrl, '_blank');
+                            }}
+                            sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'warning.main', p: 0.25 }}
+                          >
+                            Ver comprobante
+                          </Button>
+                        </Box>
+                      ) : myReceipt?.status === 'rejected' ? (
+                        <Box sx={{ p: 1.25, bgcolor: 'surface.overdue', borderRadius: 1.5, border: 1, borderColor: 'error.main' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 800, color: 'error.main', display: 'block', mb: 0.5 }}>
+                            ❌ Comprobante rechazado: {myReceipt.rejectionReason || 'Verifica los datos'}
+                          </Typography>
+                          <Button
+                            fullWidth
+                            size="small"
+                            variant="contained"
+                            color="error"
+                            startIcon={<UploadIcon sx={{ fontSize: '15px !important' }} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUploadModal({
+                                open: true,
+                                pollaId: group.id,
+                                turnNumber: currentTurn,
+                                participantId: myParticipant.id,
+                                participantName: myMemberName,
+                                quotaAmount: myQuota,
+                                recipientName,
+                                recipientBankDetails: recipientBank,
+                                memberIndex: myMemberIndex
+                              });
+                            }}
+                            sx={{ fontWeight: 800, fontSize: '0.75rem', borderRadius: 1.5, minHeight: 36 }}
+                          >
+                            Subir nuevo comprobante
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="contained"
+                          color="secondary"
+                          startIcon={<UploadIcon sx={{ fontSize: '16px !important' }} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadModal({
+                              open: true,
+                              pollaId: group.id,
+                              turnNumber: currentTurn,
+                              participantId: myParticipant.id,
+                              participantName: myMemberName,
+                              quotaAmount: myQuota,
+                              recipientName,
+                              recipientBankDetails: recipientBank,
+                              memberIndex: myMemberIndex
+                            });
+                          }}
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            borderRadius: 1.5,
+                            minHeight: 40
+                          }}
+                        >
+                          Pagar y Adjuntar Comprobante
+                        </Button>
+                      )}
+                    </Box>
+                  )}
 
                   {/* Resumen de tu participación */}
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -845,6 +974,25 @@ const ListView: React.FC<ListViewProps> = ({
         onClose={() => setProfileOpen(false)} 
         user={currentUser || null} 
       />
+
+      {/* ─── Modal de Subida de Comprobante (P2P) ─── */}
+      {uploadModal && (
+        <UploadReceiptDialog
+          open={uploadModal.open}
+          onClose={() => setUploadModal(null)}
+          pollaId={uploadModal.pollaId}
+          turnNumber={uploadModal.turnNumber}
+          participantId={uploadModal.participantId}
+          participantName={uploadModal.participantName}
+          quotaAmount={uploadModal.quotaAmount}
+          recipientName={uploadModal.recipientName}
+          recipientBankDetails={uploadModal.recipientBankDetails}
+          memberIndex={uploadModal.memberIndex}
+          onSuccess={() => {
+            setCopyFeedback("¡Comprobante enviado exitosamente! Quedó en revisión.");
+          }}
+        />
+      )}
 
       {/* Snackbar feedback copiado */}
       <Snackbar

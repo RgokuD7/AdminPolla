@@ -36,9 +36,11 @@ import {
   Share as ShareIcon,
   Search as SearchIcon,
   AccountBalance as BankIcon,
-  Check as CheckIcon
+  Check as CheckIcon,
+  Receipt as ReceiptIcon,
+  CloudUpload as UploadIcon
 } from "@mui/icons-material";
-import { AppSettings, Participant } from "@/types";
+import { AppSettings, Participant, PaymentReceipt } from "@/types";
 import { 
   formatCurrency, 
   formatDateReadable, 
@@ -50,6 +52,9 @@ import {
   triggerConfetti,
   calculateCurrentTurnFromDate 
 } from "@/utils/helpers";
+import { PollaService } from "@/services/firestore";
+import { UploadReceiptDialog } from "./UploadReceiptDialog";
+import { ReviewReceiptDialog } from "./ReviewReceiptDialog";
 
 interface DashboardViewProps {
   groupId: string;
@@ -58,6 +63,7 @@ interface DashboardViewProps {
   onTogglePayment: (id: string, memberIndex?: number) => void;
   onBatchTogglePayment?: (updates: { pid: string, memberIndex?: number }[]) => void;
   isAdmin?: boolean;
+  currentUserId?: string;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({ 
@@ -66,7 +72,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   settings, 
   onTogglePayment, 
   onBatchTogglePayment,
-  isAdmin = true
+  isAdmin = true,
+  currentUserId
 }) => {
   const [snackbar, setSnackbar] = useState<{ open: boolean, message: string, pid: string, memberIndex?: number }>({ 
     open: false, 
@@ -84,12 +91,100 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   const [relatedPayments, setRelatedPayments] = useState<{ id: string, memberIndex?: number, turnNumber: number }[]>([]);
   const [payRelated, setPayRelated] = useState(false);
 
+  // Estados de Comprobantes P2P
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean;
+    item: { p: Participant; memberIndex?: number; receipt: PaymentReceipt } | null;
+  }>({ open: false, item: null });
+
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
   const isParticipantPaid = (p: Participant, turn: number) => {
     return p.paymentHistory?.[turn] ?? false;
   };
 
   const isSharedMemberPaid = (p: Participant, memberIndex: number, turn: number) => {
     return p.members[memberIndex]?.paymentHistory?.[turn] ?? false; 
+  };
+
+  // Comprobantes pendientes de revisión para el Administrador
+  const pendingReceipts = useMemo(() => {
+    const list: { p: Participant; memberIndex?: number; receipt: PaymentReceipt }[] = [];
+    participants.forEach(p => {
+      if (p.type === 'shared') {
+        p.members.forEach((m, idx) => {
+          const r = m.paymentReceipts?.[settings.currentTurn];
+          if (r && r.status === 'in_review' && !isSharedMemberPaid(p, idx, settings.currentTurn)) {
+            list.push({ p, memberIndex: idx, receipt: r });
+          }
+        });
+      } else {
+        const r = p.paymentReceipts?.[settings.currentTurn];
+        if (r && r.status === 'in_review' && !isParticipantPaid(p, settings.currentTurn)) {
+          list.push({ p, memberIndex: undefined, receipt: r });
+        }
+      }
+    });
+    return list;
+  }, [participants, settings.currentTurn]);
+
+  // Participante del usuario actual (si es participante)
+  const myParticipantInfo = useMemo(() => {
+    if (!currentUserId) return null;
+    const p = participants.find(part => 
+      part.userId === currentUserId || 
+      part.members.some(m => m.userId === currentUserId)
+    );
+    if (!p) return null;
+
+    let memberIndex: number | undefined = undefined;
+    let isPaid = false;
+    let receipt: PaymentReceipt | undefined = undefined;
+    let quota = settings.quotaAmount;
+
+    if (p.type === 'shared') {
+      const idx = p.members.findIndex(m => m.userId === currentUserId);
+      if (idx >= 0) {
+        memberIndex = idx;
+        isPaid = isSharedMemberPaid(p, idx, settings.currentTurn);
+        receipt = p.members[idx]?.paymentReceipts?.[settings.currentTurn];
+        quota = Math.floor(settings.quotaAmount / (p.members.length || 2));
+      }
+    } else {
+      isPaid = isParticipantPaid(p, settings.currentTurn);
+      receipt = p.paymentReceipts?.[settings.currentTurn];
+    }
+
+    return {
+      participant: p,
+      memberIndex,
+      isPaid,
+      receipt,
+      quota,
+      isRecipient: p.turnNumber === settings.currentTurn
+    };
+  }, [participants, currentUserId, settings.currentTurn, settings.quotaAmount]);
+
+  const handleApproveReceipt = async () => {
+    if (!reviewModal.item) return;
+    const { p, memberIndex } = reviewModal.item;
+    await PollaService.approveReceipt(groupId, p.id, settings.currentTurn, memberIndex);
+    setSnackbar({ 
+      open: true, 
+      message: `Pago de ${memberIndex !== undefined ? p.members[memberIndex]?.name : getParticipantName(p)} aprobado`, 
+      pid: "" 
+    });
+  };
+
+  const handleRejectReceipt = async (reason: string) => {
+    if (!reviewModal.item) return;
+    const { p, memberIndex } = reviewModal.item;
+    await PollaService.rejectReceipt(groupId, p.id, settings.currentTurn, reason, memberIndex);
+    setSnackbar({ 
+      open: true, 
+      message: `Comprobante rechazado: ${reason}`, 
+      pid: "" 
+    });
   };
 
   const stats = useMemo(() => {
@@ -652,6 +747,114 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           )}
         </Stack>
 
+        {/* ─── Banner de Comprobantes Pendientes (Admin) ─── */}
+        {isAdmin && pendingReceipts.length > 0 && (
+          <Paper 
+            sx={{ 
+              p: 1.5, 
+              mb: 2, 
+              bgcolor: 'surface.pending', 
+              border: 1, 
+              borderColor: 'warning.main', 
+              borderRadius: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              gap: 1
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ReceiptIcon sx={{ color: 'warning.main', fontSize: 22 }} />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2 }}>
+                  {pendingReceipts.length === 1 ? "1 comprobante por revisar" : `${pendingReceipts.length} comprobantes por revisar`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Turno actual #{settings.currentTurn}
+                </Typography>
+              </Box>
+            </Box>
+            <Button 
+              size="small" 
+              variant="contained" 
+              color="warning" 
+              onClick={() => setReviewModal({ open: true, item: pendingReceipts[0] })}
+              sx={{ fontWeight: 800, borderRadius: 1.5, minHeight: 36, whiteSpace: 'nowrap' }}
+            >
+              Revisar
+            </Button>
+          </Paper>
+        )}
+
+        {/* ─── Card de Cuota Personal para Participante (No Admin) ─── */}
+        {!isAdmin && myParticipantInfo && !myParticipantInfo.isRecipient && (
+          <Paper
+            sx={{
+              p: 2,
+              mb: 2.5,
+              borderRadius: 2,
+              border: 1,
+              borderColor: myParticipantInfo.isPaid ? 'secondary.main' : 'divider',
+              bgcolor: 'background.paper'
+            }}
+          >
+            <Stack spacing={1.5}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.68rem' }}>
+                    TU CUOTA EN ESTE TURNO (#{settings.currentTurn})
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: 'text.primary', lineHeight: 1.1 }}>
+                    {formatCurrency(myParticipantInfo.quota)}
+                  </Typography>
+                </Box>
+
+                {myParticipantInfo.isPaid ? (
+                  <Chip
+                    icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
+                    label="PAGADA Y CONFIRMADA"
+                    size="small"
+                    sx={{ bgcolor: 'surface.paid', color: 'secondary.main', fontWeight: 800, borderRadius: 1.5 }}
+                  />
+                ) : myParticipantInfo.receipt?.status === 'in_review' ? (
+                  <Chip
+                    icon={<DotIcon sx={{ fontSize: '10px !important', color: 'warning.main' }} />}
+                    label="COMPROBANTE EN REVISIÓN"
+                    size="small"
+                    sx={{ bgcolor: 'surface.pending', color: 'warning.main', fontWeight: 800, borderRadius: 1.5 }}
+                  />
+                ) : myParticipantInfo.receipt?.status === 'rejected' ? (
+                  <Chip
+                    label="COMPROBANTE RECHAZADO"
+                    size="small"
+                    color="error"
+                    sx={{ fontWeight: 800, borderRadius: 1.5 }}
+                  />
+                ) : (
+                  <Chip
+                    label="PENDIENTE DE PAGO"
+                    size="small"
+                    sx={{ bgcolor: 'surface.pending', color: 'warning.main', fontWeight: 800, borderRadius: 1.5 }}
+                  />
+                )}
+              </Stack>
+
+              {!myParticipantInfo.isPaid && (
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  fullWidth
+                  startIcon={<UploadIcon />}
+                  onClick={() => setUploadModalOpen(true)}
+                  sx={{ fontWeight: 800, minHeight: 44, borderRadius: 2 }}
+                >
+                  {myParticipantInfo.receipt?.status === 'rejected' ? "Subir nuevo comprobante" : "Adjuntar Comprobante de Pago"}
+                </Button>
+              )}
+            </Stack>
+          </Paper>
+        )}
+
         {/* Buscador */}
         <TextField
           fullWidth
@@ -789,21 +992,78 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                           />
                         )
                       ) : (
-                        <Chip
-                          label={isPaid ? "PAGADO" : "PENDIENTE"}
-                          size="small"
-                          icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
-                          sx={{
-                            bgcolor: isPaid ? 'surface.paid' : 'surface.pending',
-                            color: isPaid ? 'success.main' : 'warning.main',
-                            fontWeight: 800,
-                            fontSize: '0.68rem',
-                            height: 24,
-                            borderRadius: 1.5,
-                            border: 1,
-                            borderColor: isPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
-                          }}
-                        />
+                        (() => {
+                          const receipt = p.paymentReceipts?.[settings.currentTurn];
+                          const hasPendingReceipt = receipt && receipt.status === 'in_review' && !isPaid;
+                          const isRejected = receipt && receipt.status === 'rejected' && !isPaid;
+
+                          if (hasPendingReceipt) {
+                            return (
+                              <Chip
+                                label="POR REVISAR"
+                                size="small"
+                                icon={<ReceiptIcon sx={{ fontSize: '13px !important' }} />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewModal({ open: true, item: { p, receipt } });
+                                }}
+                                sx={{
+                                  bgcolor: 'surface.pending',
+                                  color: 'warning.main',
+                                  fontWeight: 800,
+                                  fontSize: '0.68rem',
+                                  height: 26,
+                                  borderRadius: 1.5,
+                                  border: 1,
+                                  borderColor: 'warning.main',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            );
+                          }
+
+                          if (isRejected) {
+                            return (
+                              <Chip
+                                label="RECHAZADO"
+                                size="small"
+                                color="error"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (receipt) setReviewModal({ open: true, item: { p, receipt } });
+                                }}
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: '0.68rem',
+                                  height: 24,
+                                  borderRadius: 1.5
+                                }}
+                              />
+                            );
+                          }
+
+                          return (
+                            <Chip
+                              label={isPaid ? "PAGADO" : "PENDIENTE"}
+                              size="small"
+                              icon={<DotIcon sx={{ fontSize: '10px !important', color: isPaid ? 'success.main' : 'warning.main' }} />}
+                              onClick={isPaid && receipt?.receiptUrl ? (e) => {
+                                e.stopPropagation();
+                                window.open(receipt.receiptUrl, '_blank');
+                              } : undefined}
+                              sx={{
+                                bgcolor: isPaid ? 'surface.paid' : 'surface.pending',
+                                color: isPaid ? 'success.main' : 'warning.main',
+                                fontWeight: 800,
+                                fontSize: '0.68rem',
+                                height: 24,
+                                borderRadius: 1.5,
+                                border: 1,
+                                borderColor: isPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
+                              }}
+                            />
+                          );
+                        })()
                       )}
                     </Box>
                   </Box>
@@ -908,21 +1168,78 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
                               </Box>
 
                               {/* Chip/Botón de pago individual del miembro */}
-                              <Chip
-                                label={isMemberPaid ? "PAGADO" : "PENDIENTE"}
-                                size="small"
-                                icon={<DotIcon sx={{ fontSize: '10px !important', color: isMemberPaid ? 'success.main' : 'warning.main' }} />}
-                                sx={{
-                                  bgcolor: isMemberPaid ? 'surface.paid' : 'surface.pending',
-                                  color: isMemberPaid ? 'success.main' : 'warning.main',
-                                  fontWeight: 800,
-                                  fontSize: '0.65rem',
-                                  height: 24,
-                                  borderRadius: 1.5,
-                                  border: 1,
-                                  borderColor: isMemberPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
-                                }}
-                              />
+                              {(() => {
+                                const mReceipt = m.paymentReceipts?.[settings.currentTurn];
+                                const hasPendingM = mReceipt && mReceipt.status === 'in_review' && !isMemberPaid;
+                                const isMRejected = mReceipt && mReceipt.status === 'rejected' && !isMemberPaid;
+
+                                if (hasPendingM) {
+                                  return (
+                                    <Chip
+                                      label="POR REVISAR"
+                                      size="small"
+                                      icon={<ReceiptIcon sx={{ fontSize: '13px !important' }} />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReviewModal({ open: true, item: { p, memberIndex: mIdx, receipt: mReceipt } });
+                                      }}
+                                      sx={{
+                                        bgcolor: 'surface.pending',
+                                        color: 'warning.main',
+                                        fontWeight: 800,
+                                        fontSize: '0.65rem',
+                                        height: 24,
+                                        borderRadius: 1.5,
+                                        border: 1,
+                                        borderColor: 'warning.main',
+                                        cursor: 'pointer'
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                if (isMRejected) {
+                                  return (
+                                    <Chip
+                                      label="RECHAZADO"
+                                      size="small"
+                                      color="error"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (mReceipt) setReviewModal({ open: true, item: { p, memberIndex: mIdx, receipt: mReceipt } });
+                                      }}
+                                      sx={{
+                                        fontWeight: 800,
+                                        fontSize: '0.65rem',
+                                        height: 24,
+                                        borderRadius: 1.5
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <Chip
+                                    label={isMemberPaid ? "PAGADO" : "PENDIENTE"}
+                                    size="small"
+                                    icon={<DotIcon sx={{ fontSize: '10px !important', color: isMemberPaid ? 'success.main' : 'warning.main' }} />}
+                                    onClick={isMemberPaid && mReceipt?.receiptUrl ? (e) => {
+                                      e.stopPropagation();
+                                      window.open(mReceipt.receiptUrl, '_blank');
+                                    } : undefined}
+                                    sx={{
+                                      bgcolor: isMemberPaid ? 'surface.paid' : 'surface.pending',
+                                      color: isMemberPaid ? 'success.main' : 'warning.main',
+                                      fontWeight: 800,
+                                      fontSize: '0.65rem',
+                                      height: 24,
+                                      borderRadius: 1.5,
+                                      border: 1,
+                                      borderColor: isMemberPaid ? 'rgba(16, 185, 129, 0.25)' : 'rgba(217, 119, 6, 0.25)'
+                                    }}
+                                  />
+                                );
+                              })()}
                             </Paper>
                           );
                         })}
@@ -1050,6 +1367,54 @@ ${pendingListFormatted ? `\n⚠️ *Regularizar a la brevedad.*` : ""}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ─── Modal de Revisión de Comprobante (Admin) ─── */}
+      {reviewModal.open && reviewModal.item && (
+        <ReviewReceiptDialog
+          open={reviewModal.open}
+          onClose={() => setReviewModal({ open: false, item: null })}
+          receipt={reviewModal.item.receipt}
+          participantName={
+            reviewModal.item.memberIndex !== undefined
+              ? reviewModal.item.p.members[reviewModal.item.memberIndex]?.name
+              : getParticipantName(reviewModal.item.p)
+          }
+          turnNumber={settings.currentTurn}
+          quotaAmount={
+            reviewModal.item.p.type === 'shared'
+              ? Math.floor(settings.quotaAmount / (reviewModal.item.p.members.length || 2))
+              : settings.quotaAmount
+          }
+          onApprove={handleApproveReceipt}
+          onReject={handleRejectReceipt}
+        />
+      )}
+
+      {/* ─── Modal de Subida de Comprobante (Participante) ─── */}
+      {!isAdmin && myParticipantInfo && uploadModalOpen && (
+        <UploadReceiptDialog
+          open={uploadModalOpen}
+          onClose={() => setUploadModalOpen(false)}
+          pollaId={groupId}
+          turnNumber={settings.currentTurn}
+          participantId={myParticipantInfo.participant.id}
+          participantName={
+            myParticipantInfo.memberIndex !== undefined
+              ? myParticipantInfo.participant.members[myParticipantInfo.memberIndex]?.name
+              : getParticipantName(myParticipantInfo.participant)
+          }
+          quotaAmount={myParticipantInfo.quota}
+          recipientName={stats.recipient ? getParticipantName(stats.recipient) : "Beneficiario"}
+          recipientBankDetails={
+            stats.recipient?.members?.find(m => m.bankDetails)?.bankDetails ||
+            stats.recipient?.members?.[0]?.bankDetails
+          }
+          memberIndex={myParticipantInfo.memberIndex}
+          onSuccess={() => {
+            setSnackbar({ open: true, message: "¡Comprobante enviado exitosamente! Quedó en revisión.", pid: "" });
+          }}
+        />
+      )}
 
       {/* ─── Snackbar ─── */}
       <Snackbar 
